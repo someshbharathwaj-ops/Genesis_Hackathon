@@ -165,3 +165,11 @@ async def enroll_student(
     )
     created = await enroll_repo.create(enrollment)
     return EnrollmentResponse.model_validate(created)
+
+
+@router.post("/seed/dbms", status_code=status.HTTP_201_CREATED)
+async def seed_dbms_course(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    from app.seeds.seed_dbms_questions import seed_dbms_curriculum_and_questions
+
+    result = await seed_dbms_curriculum_and_questions(db)
+    return result
