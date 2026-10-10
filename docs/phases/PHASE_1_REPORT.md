@@ -1,0 +1,91 @@
+# Phase 1 Completion Report: Data Model, Migrations, Identity/Course Relationships, Versioned Questions, Immutable Attempts, Transactions & Idempotency
+
+## 1. Executive Summary & Gate Status
+- **Phase**: Phase 1 — Data Model, Migrations, Identity/Course Relationships, Versioned Questions, Immutable Attempts, Transactions & Idempotency
+- **Status**: **PASSED & FROZEN**
+- **Date**: 2026-10-10
+- **Lead Implementer**: `somesh.k.bharathwaj@gmail.com`
+
+---
+
+## 2. Defined Scope & Affected Contracts
+
+### Data Models & Relationships
+- **Identity & Authorization**: `users`, `courses`, `course_enrollments` (`uq_user_course_enrollment`).
+- **Curriculum DAG**: `topics`, `learning_objectives` with reviewed prerequisite hypothesis edges (`prerequisite_objective_ids` JSON array).
+- **Question Bank & Versioning**:
+  - `questions` (canonical identity and type).
+  - `question_versions` (immutable snapshots with `version_number`, `prompt`, `difficulty`, `options`, `answer_key`, `rubric`, `explanation`, `verification_status`, and SHA-256 `provenance_hash`).
+- **Attempts & Audit Provenance**:
+  - `attempts` (immutable student submissions, `is_hint_assisted`, `hint_count`, `time_spent_ms`, `score_achieved`, `max_possible_score`, `status`, and `grading_provenance` JSON audit trail).
+- **Atomic Idempotency**:
+  - `idempotency_records` (`idempotency_key`, `request_path`, `request_hash`, `response_code`, `response_body`).
+
+### API Endpoints Implemented & Frozen
+- `POST /api/v1/users` & `GET /api/v1/users/{id}` & `GET /api/v1/users`
+- `POST /api/v1/courses` & `GET /api/v1/courses/{id}` & `GET /api/v1/courses`
+- `POST /api/v1/courses/{course_id}/topics` & `GET /api/v1/courses/{course_id}/topics`
+- `POST /api/v1/courses/topics/{topic_id}/objectives`
+- `POST /api/v1/courses/{course_id}/enroll`
+- `POST /api/v1/questions` & `GET /api/v1/questions/{id}` & `POST /api/v1/questions/{id}/versions`
+- `POST /api/v1/attempts` (enforcing mandatory `Idempotency-Key` header)
+- `GET /api/v1/attempts/{id}` & `GET /api/v1/attempts/student/{student_id}`
+
+---
+
+## 3. Verification Test Evidence
+
+### Static Checks & Typing
+- **Ruff Lint**: `0 errors` (pyproject.toml strict ruleset).
+- **Mypy Type Checking**: `Success: no issues found in 39 source files` (`disallow_untyped_defs=True`).
+- **Frontend Type Checking**: `tsc --noEmit` passed with `0 errors`.
+
+### Automated Test Suite (Pytest)
+Total tests: **23 passed in 6.15s** (80% total statement coverage across all application modules).
+- **Unit Tests**:
+  - `test_default_settings`, `test_cors_origin_parsing_from_string`
+  - `test_problem_details_defaults`, `test_resource_not_found_exception`, `test_assessment_lockout_exception`, `test_idempotency_conflict_exception`, `test_insufficient_grounding_exception`
+  - `test_provenance_hash_is_deterministic`: Verifies SHA-256 invariance on prompt + answer_key + rubric.
+  - `test_payload_hash_key_order_invariance`: Verifies SHA-256 idempotency request hash ignores JSON key ordering.
+  - `test_user_repository_crud`: Verification of user create, retrieve, list, delete.
+  - `test_course_repository_get_by_code`: Verification of course code lookup.
+  - `test_idempotency_service_record_and_conflict`: Direct unit test of duplicate detection and payload conflict exception.
+- **Contract & Integration Tests**:
+  - `test_openapi_schema_contains_health_and_problem_details`, `test_healthz_contract_format`, `test_readyz_contract_format`
+  - `test_full_phase1_lifecycle_and_idempotency`:
+    - Full entity chain: User -> Course -> Topic -> Learning Objective -> Question -> Version 1 -> Version 2.
+    - Version number increment verification (1 -> 2) with distinct provenance hashes.
+    - Idempotent submission: First call creates attempt (`201 Created`); identical replay returns cached record (`200 OK`) without creating duplicate attempt rows.
+  - `test_attempt_with_hint_penalty_and_repetition_discount`:
+    - Verified hint penalty degradation ($W_{\text{hint}}$ applied proportionally).
+    - Verified repetition discount flag (`repetition_discount_applied: True`) on repeated attempts.
+- **Negative & Security Tests**:
+  - Conflicting payload reused with existing `Idempotency-Key` yields RFC 7807 `409 Conflict` (`IDEMPOTENCY_CONFLICT`).
+  - Scored diagnostic attempt submitted against draft/unverified question yields RFC 7807 `422 Unprocessable Entity` (`UNVERIFIED_EVIDENCE`).
+  - Duplicate user registration yields RFC 7807 `409 Conflict` (`USER_EMAIL_EXISTS`).
+  - Duplicate course code yields RFC 7807 `409 Conflict` (`COURSE_CODE_EXISTS`).
+  - 404 responses for non-existent users, courses, questions, attempts conform to RFC 7807 `application/problem+json`.
+- **Regression Suite**:
+  - All Phase 0 health and readiness probes passed with 100% compatibility.
+
+---
+
+## 4. Capability Matrix: BUILD / FLAG / STATE
+
+| Category | Capability | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **BUILD** | Relational Schema & Alembic Migration | Verified | `001_initial_schema` ready for PostgreSQL & SQLite |
+| **BUILD** | Versioned Question Entities | Verified | SHA-256 provenance hash on every version |
+| **BUILD** | Immutable Attempts & Provenance | Verified | No in-place updates; audit trail logged |
+| **BUILD** | Cryptographic Idempotency | Verified | SHA-256 payload matching and conflict detection |
+| **FLAG** | `repetition_discount_applied` | Supported | Deduplication flag on repeat attempts |
+| **FLAG** | `is_hint_assisted` | Supported | Hint count and score degradation |
+| **STATE** | Question Verification State | Operational | Enforces `verified` status for scored assessments |
+| **STATE** | Assessment Context State | Operational | Partitioned into diagnostic, checkpoint, practice, review |
+
+---
+
+## 5. Known Limitations & Phase 2 Gate Handover
+- Phase 1 baseline deterministic grading verifies exact and set-based matching.
+- **Phase 2 Gate Handover**: Implements the Verified DBMS Question Bank for Functional Dependencies, Armstrong's Axioms, Attribute Closures, Candidate Keys, Minimal Covers, and BCNF/3NF Normalization decompositions with custom domain engines and formal equivalence algorithms.
+- **Phase 1 is formally FROZEN.**
