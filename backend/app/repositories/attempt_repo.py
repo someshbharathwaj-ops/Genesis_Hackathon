@@ -55,3 +55,22 @@ class AttemptRepository(BaseRepository[Attempt]):
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def list_by_student_for_objectives(
+        self, student_id: str, objective_ids: list[str]
+    ) -> list[Attempt]:
+        if not objective_ids:
+            return []
+        from app.models.question import Question
+
+        stmt = (
+            select(Attempt)
+            .join(Question, Attempt.question_id == Question.id)
+            .where(
+                Attempt.student_id == student_id,
+                Question.objective_id.in_(objective_ids),
+            )
+            .order_by(Attempt.created_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

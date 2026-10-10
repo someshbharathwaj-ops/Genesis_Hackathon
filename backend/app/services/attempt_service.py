@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import RecallException, ResourceNotFoundError
 from app.models.attempt import AssessmentContext, Attempt, AttemptStatus
+from app.modules.adaptive_learning.dbms_grader import DBMSDeterministicGrader
 from app.repositories.attempt_repo import AttemptRepository
 from app.repositories.question_repo import QuestionRepository, QuestionVersionRepository
 from app.repositories.user_repo import UserRepository
@@ -93,41 +94,32 @@ class AttemptService:
         )
 
         # 5. Deterministic grading evaluation
-        expected_answer = version.answer_key.get("value")
-        actual_answer = submitted_answer.get("value")
+        q_type_str = (
+            question.question_type.value
+            if hasattr(question.question_type, "value")
+            else str(question.question_type)
+        )
+        grading_outcome = DBMSDeterministicGrader.grade(
+            question_type=q_type_str,
+            answer_key=version.answer_key,
+            rubric=version.rubric,
+            submitted_answer=submitted_answer,
+            max_score=version.max_score,
+            is_hint_assisted=is_hint_assisted,
+            hint_count=hint_count,
+            prior_attempt_count=prior_attempt_count,
+        )
 
-        is_correct = False
-        score_achieved = 0.0
-        max_possible_score = version.max_score
-
-        if actual_answer is not None and expected_answer is not None:
-            if isinstance(expected_answer, list) and isinstance(actual_answer, list):
-                is_correct = sorted(actual_answer) == sorted(expected_answer)
-            else:
-                is_correct = str(actual_answer).strip() == str(expected_answer).strip()
-
-        if is_correct:
-            # Discount for hints in scored context
-            if is_hint_assisted and hint_count > 0:
-                hint_penalty = min(0.65, 0.25 * hint_count)
-                score_achieved = max(0.0, max_possible_score * (1.0 - hint_penalty))
-            else:
-                score_achieved = max_possible_score
+        is_correct = grading_outcome.is_correct
+        score_achieved = grading_outcome.score_achieved
+        max_possible_score = grading_outcome.max_possible_score
 
         # Provenance audit block
-        provenance = {
-            "evaluator": "DeterministicBaselineGrader",
-            "evaluated_at": datetime.now(UTC).isoformat(),
-            "question_version_id": version.id,
-            "version_number": version.version_number,
-            "provenance_hash": version.provenance_hash,
-            "expected_answer_ref": version.answer_key.get("reference", "key"),
-            "is_hint_assisted": is_hint_assisted,
-            "hint_count": hint_count,
-            "prior_attempt_count": prior_attempt_count,
-            "repetition_discount_applied": prior_attempt_count > 0,
-            "rubric_match": "exact" if is_correct else "mismatch",
-        }
+        provenance = grading_outcome.provenance
+        provenance["question_version_id"] = version.id
+        provenance["version_number"] = version.version_number
+        provenance["provenance_hash"] = version.provenance_hash
+        provenance["expected_answer_ref"] = version.answer_key.get("reference", "key")
 
         # 6. Instantiate Attempt record
         attempt = Attempt(

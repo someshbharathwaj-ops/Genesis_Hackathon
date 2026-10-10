@@ -19,10 +19,12 @@ Educational AI systems frequently suffer from non-deterministic grading, halluci
 1. **Authoritative Code**:
    - Deterministic Python algorithms compute all grades, objective coverage, evidence confidence, attempt eligibility, diagnostic routing, and spaced repetition schedules.
    - Database transactions commit immutable grading records with complete provenance.
-2. **Bounded LLM**:
-   - The LLM adapter is restricted to text summarization, grounded Socratic hinting (only when permitted by policy), and structured explanation formatting.
-   - Output from the LLM is validated against strict Pydantic schemas.
-   - Under no circumstances does LLM output modify student mastery state or override grading keys.
+2. **Bounded Model Execution & Collaborative SLM Verification**:
+   - The language model layer is restricted to text summarization, grounded Socratic hinting (only when permitted by policy), and structured explanation formatting.
+   - For generative explanation and review tasks, the target design utilizes a collaborative Small Language Model (SLM) verification pipeline with role-differentiated generation, evidence review, and adversarial challenge (Generator, Evidence Reviewer, Challenger) coordinated by a deterministic Verification Controller.
+   - Output from models is validated against strict Pydantic schemas.
+   - Under no circumstances does model output modify student mastery state, assign grades, or override grading keys.
+   - For formal technical domains (such as Relational DBMS logic), deterministic backend algorithms and known-answer test suites are used directly rather than delegating correctness to language models.
 
 ## Consequences
 - **Positive**: Complete auditability, academic integrity, zero risk of grading drift or hallucinated mastery credentials.

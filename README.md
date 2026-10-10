@@ -8,7 +8,7 @@
 Recall comprises three tightly coupled logical engines deployed as a high-performance modular monolith:
 1. **Adaptive Learning Engine**: Authoritative deterministic grading, mastery estimation, diagnostic exploration, and review scheduling.
 2. **Knowledge Engine**: Verified curriculum ingestion (PDF/PPT), slide metadata preservation, pgvector hybrid retrieval, and strict citation abstention.
-3. **AI Execution Engine**: Bounded SLM adapter (Ollama/Qwen 2.5), strict JSON validation, circuit-breaker timeouts, and server-enforced tutor lockouts during scored assessments.
+3. **AI Execution Engine**: Bounded collaborative SLM verification pipeline (Generator, Evidence Reviewer, Challenger roles; Qwen 2.5 local baseline), strict JSON validation, circuit-breaker timeouts, and server-enforced tutor lockouts during scored assessments.
 
 ---
 
