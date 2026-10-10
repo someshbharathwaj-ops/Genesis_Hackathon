@@ -111,6 +111,41 @@ class InsufficientGroundingError(RecallException):
         )
 
 
+class UnsupportedDocumentFormatError(RecallException):
+    def __init__(self, mime_or_ext: str):
+        super().__init__(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            code="UNSUPPORTED_DOCUMENT_FORMAT",
+            title="Unsupported Document Format",
+            detail=(
+                f"Document format '{mime_or_ext}' is not supported. Supported formats: PDF, TXT."
+            ),
+        )
+
+
+class DocumentExtractionError(RecallException):
+    def __init__(self, reason: str):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code="DOCUMENT_EXTRACTION_ERROR",
+            title="Document Extraction Failed",
+            detail=f"Failed to extract text from document: {reason}",
+        )
+
+
+class DocumentEncryptedError(RecallException):
+    def __init__(self, filename: str):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code="DOCUMENT_ENCRYPTED",
+            title="Encrypted Document Not Supported",
+            detail=(
+                f"Document '{filename}' is password-protected or encrypted. "
+                "Please provide an unencrypted version."
+            ),
+        )
+
+
 async def recall_exception_handler(request: Request, exc: RecallException) -> JSONResponse:
     problem = ProblemDetails(
         type=exc.type_uri,

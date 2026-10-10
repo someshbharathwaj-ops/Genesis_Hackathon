@@ -9,6 +9,7 @@ from app.models.attempt import (
 )
 from app.models.base import TimestampMixin, UUIDMixin
 from app.models.curriculum import LearningObjective, Topic
+from app.models.document import CourseDocument, DocumentChunk, DocumentStatus
 from app.models.identity import Course, CourseEnrollment, User, UserRole
 from app.models.question import (
     DifficultyLevel,
@@ -37,4 +38,7 @@ __all__ = [
     "AttemptStatus",
     "AssessmentContext",
     "IdempotencyRecord",
+    "CourseDocument",
+    "DocumentChunk",
+    "DocumentStatus",
 ]
