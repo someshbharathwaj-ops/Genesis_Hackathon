@@ -25,6 +25,7 @@ from app.schemas.identity import (
     EnrollmentCreate,
     EnrollmentResponse,
 )
+from app.services.curriculum_service import CurriculumValidator
 
 router = APIRouter(prefix="/courses", tags=["Courses & Curriculum"])
 
@@ -118,7 +119,23 @@ async def create_objective(
     if not topic:
         raise ResourceNotFoundError("Topic", topic_id)
 
+    # Fetch all topics in this course to establish course-scoped objectives
+    course_topics = await topic_repo.list_by_course(topic.course_id)
+    existing_objectives: list[LearningObjective] = []
+    for t in course_topics:
+        existing_objectives.extend(t.objectives)
+
+    # Validate prerequisites and detect arbitrary cycles across course curriculum DAG
+    CurriculumValidator.validate_new_objective(
+        course_id=topic.course_id,
+        topic_id=topic_id,
+        proposed_code=payload.code,
+        proposed_prerequisites=payload.prerequisite_objective_ids,
+        existing_objectives=existing_objectives,
+    )
+
     lo_repo = LearningObjectiveRepository(db)
+
     obj = LearningObjective(
         topic_id=topic_id,
         code=payload.code,

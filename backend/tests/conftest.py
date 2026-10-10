@@ -1,9 +1,12 @@
 """Global pytest fixtures and test client configuration."""
 
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base, get_db
@@ -11,6 +14,14 @@ from app.main import app
 
 # Shared in-memory SQLite engine for tests
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
+    if hasattr(dbapi_connection, "cursor"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 @pytest.fixture

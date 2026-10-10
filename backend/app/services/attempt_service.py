@@ -5,6 +5,7 @@ immutable grading provenance, and idempotency.
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import RecallException, ResourceNotFoundError
@@ -147,22 +148,34 @@ class AttemptService:
             grading_provenance=provenance,
         )
 
-        await self.attempt_repo.create(attempt)
+        try:
+            await self.attempt_repo.create(attempt)
 
-        # 7. Record idempotency outcome in same transaction
-        response_representation = {
-            "attempt_id": attempt.id,
-            "is_correct": is_correct,
-            "score_achieved": score_achieved,
-            "max_possible_score": max_possible_score,
-            "status": attempt.status.value,
-        }
-        await self.idempotency_service.record_response(
-            idempotency_key=idempotency_key,
-            request_path="/api/v1/attempts",
-            request_payload=request_payload,
-            status_code=201,
-            response_body=response_representation,
-        )
-
-        return attempt, False
+            # 7. Record idempotency outcome in same transaction
+            response_representation = {
+                "attempt_id": attempt.id,
+                "is_correct": is_correct,
+                "score_achieved": score_achieved,
+                "max_possible_score": max_possible_score,
+                "status": attempt.status.value,
+            }
+            await self.idempotency_service.record_response(
+                idempotency_key=idempotency_key,
+                request_path="/api/v1/attempts",
+                request_payload=request_payload,
+                status_code=201,
+                response_body=response_representation,
+            )
+            return attempt, False
+        except IntegrityError:
+            await self.session.rollback()
+            # A concurrent worker committed an attempt with the same idempotency key
+            existing = await self.attempt_repo.get_by_idempotency_key(idempotency_key)
+            if existing:
+                # Re-verify through idempotency service to ensure payload matched
+                await self.idempotency_service.get_existing_result(
+                    idempotency_key=idempotency_key,
+                    request_payload=request_payload,
+                )
+                return existing, True
+            raise
