@@ -9,31 +9,40 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        primary: {
-          50: "#eef2ff",
-          100: "#e0e7ff",
-          500: "#6366f1",
-          600: "#4f46e5",
-          700: "#4338ca",
+        background: "#FFFBF2",
+        foreground: "#17171A",
+        ink: {
+          DEFAULT: "#17171A",
+          muted: "#5A5A62",
+          faint: "#8E8E98",
         },
         surface: {
-          50: "#090d16",
-          100: "#0f172a",
-          200: "#1e293b",
-          300: "#334155",
+          DEFAULT: "#FFFFFF",
+          warm: "#FFFBF2",
+          muted: "#F7F2E7",
+          border: "#17171A",
         },
-        accent: {
-          emerald: "#10b981",
-          amber: "#f59e0b",
-          rose: "#f43f5e",
-          cyan: "#06b6d4",
+        brand: {
+          yellow: "#FFC800", // Primary action & learning focus
+          coral: "#FF5A4F",  // Alerts, streak energy
+          green: "#22C55E",  // Correctness, mastery progress
+          cyan: "#2BB8F0",   // Secondary info, links
         },
       },
+      boxShadow: {
+        hard: "0 4px 0 #17171A",
+        "hard-sm": "0 2px 0 #17171A",
+        "hard-lg": "0 6px 0 #17171A",
+        "hard-pressed": "0 1px 0 #17171A",
+      },
+      borderRadius: {
+        friendly: "16px",
+        "friendly-sm": "12px",
+        "friendly-lg": "20px",
+      },
       fontFamily: {
-        sans: ["var(--font-inter)", "sans-serif"],
-        mono: ["var(--font-mono)", "monospace"],
+        sans: ["var(--font-sans)", "system-ui", "-apple-system", "sans-serif"],
+        display: ["var(--font-display)", "system-ui", "-apple-system", "sans-serif"],
       },
     },
   },

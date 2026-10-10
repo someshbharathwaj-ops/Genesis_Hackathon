@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Recall — Grounded Adaptive Learning Platform",
-  description: "Institutional-grade adaptive learning and remediation with deterministic authority and verified curriculum grounding.",
+  title: "Recall — Course-Aware Adaptive Learning Platform",
+  description: "Course-aware adaptive learning platform with deterministic authority, grounded AI remediation, and verified curriculum provenance.",
 };
 
 export default function RootLayout({
@@ -12,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-surface-50 text-slate-100 min-h-screen antialiased selection:bg-indigo-500 selection:text-white">
+    <html lang="en">
+      <body className="bg-background text-foreground min-h-screen antialiased selection:bg-brand-yellow selection:text-ink">
         {children}
       </body>
     </html>
