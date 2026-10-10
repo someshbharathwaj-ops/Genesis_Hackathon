@@ -2,7 +2,15 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import attempts, courses, health, mastery, questions, users
+from app.api.v1.endpoints import (
+    attempts,
+    courses,
+    diagnosis,
+    health,
+    mastery,
+    questions,
+    users,
+)
 
 api_v1_router = APIRouter()
 
@@ -15,3 +23,4 @@ api_v1_router.include_router(courses.router)
 api_v1_router.include_router(questions.router)
 api_v1_router.include_router(attempts.router)
 api_v1_router.include_router(mastery.router)
+api_v1_router.include_router(diagnosis.router)
