@@ -133,11 +133,13 @@ async def validation_exception_handler(
 ) -> JSONResponse:
     invalid_params = []
     for err in exc.errors():
-        invalid_params.append({
-            "name": ".".join(str(loc) for loc in err["loc"]),
-            "reason": err["msg"],
-            "type": err["type"],
-        })
+        invalid_params.append(
+            {
+                "name": ".".join(str(loc) for loc in err["loc"]),
+                "reason": err["msg"],
+                "type": err["type"],
+            }
+        )
 
     problem = ProblemDetails(
         type="https://recall.edu/errors/VALIDATION_ERROR",

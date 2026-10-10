@@ -1,6 +1,5 @@
 """Application configuration loaded from environment variables."""
 
-
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

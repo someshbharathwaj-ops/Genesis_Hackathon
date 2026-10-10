@@ -80,9 +80,7 @@ class CourseEnrollment(Base, UUIDMixin, TimestampMixin):
     """Student enrollment in an active course."""
 
     __tablename__ = "course_enrollments"
-    __table_args__ = (
-        UniqueConstraint("user_id", "course_id", name="uq_user_course_enrollment"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "course_id", name="uq_user_course_enrollment"),)
 
     user_id: Mapped[str] = mapped_column(
         String(36),

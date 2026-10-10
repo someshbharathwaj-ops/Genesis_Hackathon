@@ -17,9 +17,7 @@ class Topic(Base, UUIDMixin, TimestampMixin):
     """Subject matter topic within a course."""
 
     __tablename__ = "topics"
-    __table_args__ = (
-        UniqueConstraint("course_id", "code", name="uq_topic_course_code"),
-    )
+    __table_args__ = (UniqueConstraint("course_id", "code", name="uq_topic_course_code"),)
 
     course_id: Mapped[str] = mapped_column(
         String(36),
@@ -47,9 +45,7 @@ class LearningObjective(Base, UUIDMixin, TimestampMixin):
     """Granular learning objective within a topic."""
 
     __tablename__ = "learning_objectives"
-    __table_args__ = (
-        UniqueConstraint("topic_id", "code", name="uq_lo_topic_code"),
-    )
+    __table_args__ = (UniqueConstraint("topic_id", "code", name="uq_lo_topic_code"),)
 
     topic_id: Mapped[str] = mapped_column(
         String(36),

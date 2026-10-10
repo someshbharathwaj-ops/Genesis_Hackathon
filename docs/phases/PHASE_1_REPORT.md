@@ -36,12 +36,14 @@
 ## 3. Verification Test Evidence
 
 ### Static Checks & Typing
-- **Ruff Lint**: `0 errors` (pyproject.toml strict ruleset).
-- **Mypy Type Checking**: `Success: no issues found in 39 source files` (`disallow_untyped_defs=True`).
+- **Ruff Lint**: `0 errors` (pyproject.toml strict ruleset across all 40 backend files).
+- **Mypy Type Checking**: `Success: no issues found in 40 source files` (`disallow_untyped_defs=True`).
 - **Frontend Type Checking**: `tsc --noEmit` passed with `0 errors`.
+- **Frontend Production Build**: `next build` passed with `0 errors`.
+- **Alembic Static DDL Migration**: `alembic upgrade head --sql` cleanly generated all transactional DDL with 0 errors.
 
 ### Automated Test Suite (Pytest)
-Total tests: **23 passed in 6.15s** (80% total statement coverage across all application modules).
+Total tests: **24 passed in 2.92s** (100% passing across unit, integration, and contract tests).
 - **Unit Tests**:
   - `test_default_settings`, `test_cors_origin_parsing_from_string`
   - `test_problem_details_defaults`, `test_resource_not_found_exception`, `test_assessment_lockout_exception`, `test_idempotency_conflict_exception`, `test_insufficient_grounding_exception`
@@ -59,6 +61,9 @@ Total tests: **23 passed in 6.15s** (80% total statement coverage across all app
   - `test_attempt_with_hint_penalty_and_repetition_discount`:
     - Verified hint penalty degradation ($W_{\text{hint}}$ applied proportionally).
     - Verified repetition discount flag (`repetition_discount_applied: True`) on repeated attempts.
+  - `test_seed_dbms_curriculum_and_idempotency`:
+    - Verified creation of CS340 course, FD_NORM topic, 5 learning objectives, and initial question catalog.
+    - Verified subsequent seed execution produces 0 duplicate records.
 - **Negative & Security Tests**:
   - Conflicting payload reused with existing `Idempotency-Key` yields RFC 7807 `409 Conflict` (`IDEMPOTENCY_CONFLICT`).
   - Scored diagnostic attempt submitted against draft/unverified question yields RFC 7807 `422 Unprocessable Entity` (`UNVERIFIED_EVIDENCE`).

@@ -1,6 +1,5 @@
 """Health, liveness, and readiness probe endpoints."""
 
-
 from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 

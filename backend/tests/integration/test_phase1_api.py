@@ -374,3 +374,20 @@ async def test_identity_and_course_conflict_and_queries(
     assert (await async_client.get("/api/v1/questions/nonexistent-q")).status_code == 404
     assert (await async_client.get("/api/v1/attempts/nonexistent-att")).status_code == 404
 
+
+@pytest.mark.integration
+async def test_seed_dbms_curriculum_and_idempotency(async_client: AsyncClient) -> None:
+    # 1. First seeding creates the course, topic, 5 objectives, and catalog questions
+    seed_resp = await async_client.post("/api/v1/courses/seed/dbms")
+    assert seed_resp.status_code == 201
+    data = seed_resp.json()
+    assert data["status"] == "success"
+    assert data["objectives_count"] == 5
+    assert data["new_questions_seeded"] >= 8
+
+    # 2. Second seeding is strictly idempotent (0 new questions created)
+    re_seed_resp = await async_client.post("/api/v1/courses/seed/dbms")
+    assert re_seed_resp.status_code == 201
+    re_data = re_seed_resp.json()
+    assert re_data["status"] == "success"
+    assert re_data["new_questions_seeded"] == 0

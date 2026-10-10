@@ -1,6 +1,5 @@
 """Attempt submission and provenance inspection endpoints."""
 
-
 from fastapi import APIRouter, Depends, Header, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,9 +40,7 @@ async def submit_attempt(
 
 
 @router.get("/{attempt_id}", response_model=AttemptResponse)
-async def get_attempt(
-    attempt_id: str, db: AsyncSession = Depends(get_db)
-) -> AttemptResponse:
+async def get_attempt(attempt_id: str, db: AsyncSession = Depends(get_db)) -> AttemptResponse:
     repo = AttemptRepository(db)
     attempt = await repo.get_by_id(attempt_id)
     if not attempt:

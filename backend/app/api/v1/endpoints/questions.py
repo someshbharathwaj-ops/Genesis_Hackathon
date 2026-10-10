@@ -1,6 +1,5 @@
 """Versioned questions endpoints."""
 
-
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,9 +69,7 @@ async def create_question(
 
 
 @router.get("/{question_id}", response_model=QuestionResponse)
-async def get_question(
-    question_id: str, db: AsyncSession = Depends(get_db)
-) -> QuestionResponse:
+async def get_question(question_id: str, db: AsyncSession = Depends(get_db)) -> QuestionResponse:
     q_repo = QuestionRepository(db)
     question = await q_repo.get_with_versions(question_id)
     if not question:

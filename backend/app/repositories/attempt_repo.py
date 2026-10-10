@@ -1,6 +1,5 @@
 """Attempt repository for recording and auditing immutable submissions."""
 
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -36,9 +35,7 @@ class AttemptRepository(BaseRepository[Attempt]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def count_student_attempts_on_question(
-        self, student_id: str, question_id: str
-    ) -> int:
+    async def count_student_attempts_on_question(self, student_id: str, question_id: str) -> int:
         stmt = select(func.count(Attempt.id)).where(
             Attempt.student_id == student_id,
             Attempt.question_id == question_id,

@@ -76,9 +76,7 @@ class QuestionVersionRepository(BaseRepository[QuestionVersion]):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def get_by_version(
-        self, question_id: str, version_number: int
-    ) -> QuestionVersion | None:
+    async def get_by_version(self, question_id: str, version_number: int) -> QuestionVersion | None:
         stmt = select(QuestionVersion).where(
             QuestionVersion.question_id == question_id,
             QuestionVersion.version_number == version_number,

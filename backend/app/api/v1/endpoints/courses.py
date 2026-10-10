@@ -1,5 +1,4 @@
-"""Course and curriculum endpoints."""
-
+from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,9 +62,7 @@ async def list_courses(
 
 
 @router.get("/{course_id}", response_model=CourseResponse)
-async def get_course(
-    course_id: str, db: AsyncSession = Depends(get_db)
-) -> CourseResponse:
+async def get_course(course_id: str, db: AsyncSession = Depends(get_db)) -> CourseResponse:
     repo = CourseRepository(db)
     course = await repo.get_by_id(course_id)
     if not course:
@@ -165,3 +162,11 @@ async def enroll_student(
     )
     created = await enroll_repo.create(enrollment)
     return EnrollmentResponse.model_validate(created)
+
+
+@router.post("/seed/dbms", status_code=status.HTTP_201_CREATED)
+async def seed_dbms_course(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    from app.seeds.seed_dbms_questions import seed_dbms_curriculum_and_questions
+
+    result = await seed_dbms_curriculum_and_questions(db)
+    return result

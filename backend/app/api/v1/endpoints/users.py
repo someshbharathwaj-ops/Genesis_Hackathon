@@ -1,6 +1,5 @@
 """User identity endpoints."""
 
-
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,9 +13,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(
-    payload: UserCreate, db: AsyncSession = Depends(get_db)
-) -> UserResponse:
+async def create_user(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> UserResponse:
     repo = UserRepository(db)
     existing = await repo.get_by_email(payload.email)
     if existing:
@@ -36,9 +33,7 @@ async def create_user(
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-async def get_user(
-    user_id: str, db: AsyncSession = Depends(get_db)
-) -> UserResponse:
+async def get_user(user_id: str, db: AsyncSession = Depends(get_db)) -> UserResponse:
     repo = UserRepository(db)
     user = await repo.get_by_id(user_id)
     if not user:

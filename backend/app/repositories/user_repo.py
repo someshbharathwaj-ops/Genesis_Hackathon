@@ -1,6 +1,5 @@
 """User and enrollment repositories."""
 
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

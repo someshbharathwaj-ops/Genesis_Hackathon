@@ -44,9 +44,7 @@ class Attempt(Base, UUIDMixin, TimestampMixin):
     """Immutable record of an individual question attempt and its grading provenance."""
 
     __tablename__ = "attempts"
-    __table_args__ = (
-        UniqueConstraint("idempotency_key", name="uq_attempt_idempotency_key"),
-    )
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_attempt_idempotency_key"),)
 
     idempotency_key: Mapped[str] = mapped_column(
         String(64),
@@ -126,9 +124,7 @@ class IdempotencyRecord(Base, UUIDMixin, TimestampMixin):
     """Storage for idempotency keys to prevent double-submissions and race conditions."""
 
     __tablename__ = "idempotency_records"
-    __table_args__ = (
-        UniqueConstraint("idempotency_key", name="uq_idempotency_record_key"),
-    )
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_idempotency_record_key"),)
 
     idempotency_key: Mapped[str] = mapped_column(
         String(64),
