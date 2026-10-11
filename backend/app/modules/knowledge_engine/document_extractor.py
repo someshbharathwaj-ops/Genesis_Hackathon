@@ -26,7 +26,7 @@ class DocumentExtractionResult:
 class DocumentExtractor:
     """Robust extractor extracting text page-by-page from course documents."""
 
-    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".markdown"}
+    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".markdown", ".docx", ".pptx"}
 
     @classmethod
     def extract_from_bytes(
@@ -51,6 +51,10 @@ class DocumentExtractor:
             or mime_type in ("text/plain", "text/markdown", "application/x-markdown")
         ):
             return cls._extract_txt(file_bytes)
+        elif ext == ".docx" or mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            return cls._extract_docx(file_bytes, filename)
+        elif ext == ".pptx" or mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+            return cls._extract_pptx(file_bytes, filename)
         else:
             raise UnsupportedDocumentFormatError(ext or (mime_type or "unknown"))
 
@@ -115,3 +119,55 @@ class DocumentExtractor:
             page_count=1,
             is_empty=False,
         )
+
+    @classmethod
+    def _extract_docx(cls, file_bytes: bytes, filename: str) -> DocumentExtractionResult:
+        import zipfile
+        import xml.etree.ElementTree as ET
+
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                xml_content = z.read("word/document.xml")
+                tree = ET.fromstring(xml_content)
+                text = " ".join(tree.itertext()).strip()
+                if not text:
+                    return DocumentExtractionResult(text_by_page=[], page_count=0, is_empty=True)
+                return DocumentExtractionResult(
+                    text_by_page=[(1, text)],
+                    page_count=1,
+                    is_empty=False,
+                )
+        except Exception as exc:
+            raise DocumentExtractionError(f"Error extracting DOCX '{filename}': {exc}") from exc
+
+    @classmethod
+    def _extract_pptx(cls, file_bytes: bytes, filename: str) -> DocumentExtractionResult:
+        import zipfile
+        import xml.etree.ElementTree as ET
+
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                slide_names = sorted(
+                    [
+                        name
+                        for name in z.namelist()
+                        if name.startswith("ppt/slides/slide") and name.endswith(".xml")
+                    ],
+                    key=lambda x: int("".join(filter(str.isdigit, x)) or "0"),
+                )
+                if not slide_names:
+                    return DocumentExtractionResult(text_by_page=[], page_count=0, is_empty=True)
+                pages: list[tuple[int, str]] = []
+                for idx, sname in enumerate(slide_names):
+                    tree = ET.fromstring(z.read(sname))
+                    txt = " ".join(tree.itertext()).strip()
+                    if txt:
+                        pages.append((idx + 1, txt))
+                return DocumentExtractionResult(
+                    text_by_page=pages,
+                    page_count=len(slide_names),
+                    is_empty=len(pages) == 0,
+                )
+        except Exception as exc:
+            raise DocumentExtractionError(f"Error extracting PPTX '{filename}': {exc}") from exc
+
