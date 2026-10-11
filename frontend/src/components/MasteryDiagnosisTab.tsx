@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRight,
   Brain,
   CheckCircle2,
   Clock,
@@ -26,12 +27,18 @@ interface MasteryDiagnosisTabProps {
   course: CourseResponse | null;
   currentUser: UserResponse | null;
   onStartProbingPlan?: (plan: DiagnosticSessionPlanResponse) => void;
+  onWriteTest?: () => void;
+  preparationNotice?: string | null;
+  onClearPreparationNotice?: () => void;
 }
 
 export function MasteryDiagnosisTab({
   course,
   currentUser,
   onStartProbingPlan,
+  onWriteTest,
+  preparationNotice,
+  onClearPreparationNotice,
 }: MasteryDiagnosisTabProps) {
   const [masterySummary, setMasterySummary] = useState<CourseMasterySummaryResponse | null>(null);
   const [diagnosticSummary, setDiagnosticSummary] = useState<CourseDiagnosticSummaryResponse | null>(null);
@@ -106,6 +113,49 @@ export function MasteryDiagnosisTab({
 
   return (
     <div className="flex flex-col gap-8">
+      {/* Diagnostic Retest Notice if arriving from Tutor Preparation */}
+      {preparationNotice && (
+        <div className="tactile-card border-brand-yellow bg-brand-yellow/15 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in shadow-hard">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-friendly-sm bg-brand-yellow text-ink border-2 border-ink flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-black text-sm text-ink flex items-center gap-2">
+                <span>Diagnostic Retest Mode</span>
+                <span className="tactile-tag bg-brand-yellow text-ink text-[10px] uppercase font-black">
+                  Review &amp; Test
+                </span>
+              </div>
+              <p className="text-xs text-ink-muted font-medium mt-0.5">
+                {preparationNotice}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onWriteTest && (
+              <button
+                type="button"
+                onClick={onWriteTest}
+                className="tactile-btn-yellow text-xs py-2 px-4 font-black flex items-center gap-1.5 shadow-hard-sm hover:scale-[1.02] transition-transform"
+              >
+                <span>✍️ Write Test Now</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {onClearPreparationNotice && (
+              <button
+                type="button"
+                onClick={onClearPreparationNotice}
+                className="tactile-btn-white text-xs py-2 px-3 font-bold"
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Overview Stat Cards */}
       <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="tactile-card p-5 flex flex-col justify-between">

@@ -70,6 +70,7 @@ export default function HomePage() {
     useState<LearningObjectiveResponse | null>(null);
   const [tutorInitialQuery, setTutorInitialQuery] = useState<string | null>(null);
   const [tutorAssessmentTitle, setTutorAssessmentTitle] = useState<string | null>(null);
+  const [preparationNotice, setPreparationNotice] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState<boolean>(false);
 
   // Initialize Platform
@@ -622,6 +623,20 @@ export default function HomePage() {
                   setTutorInitialQuery(null);
                   setTutorAssessmentTitle(null);
                 }}
+                onProceedToTest={(attemptCount) => {
+                  if (attemptCount === 0) {
+                    setPreparationNotice(
+                      "First attempt ready! Answer questions in the test workbench below to record your baseline mastery."
+                    );
+                    setMentorMode("revisor");
+                    setActiveTab("revisor");
+                  } else {
+                    setPreparationNotice(
+                      `Diagnostic Retest Ready (Attempt #${attemptCount + 1}). Review your knowledge decay curve below, then write your test.`
+                    );
+                    setActiveTab("mastery");
+                  }
+                }}
               />
             )}
 
@@ -637,6 +652,8 @@ export default function HomePage() {
                   )
                 }
                 targetObjective={targetObjectiveForPractice}
+                preparationNotice={preparationNotice}
+                onClearPreparationNotice={() => setPreparationNotice(null)}
               />
             )}
 
@@ -658,6 +675,15 @@ export default function HomePage() {
                   setMentorMode("revisor");
                   setActiveTab("revisor");
                 }}
+                onWriteTest={() => {
+                  setPreparationNotice(
+                    "Retest mode initialized from diagnosis. Write and submit your answers below."
+                  );
+                  setMentorMode("revisor");
+                  setActiveTab("revisor");
+                }}
+                preparationNotice={preparationNotice}
+                onClearPreparationNotice={() => setPreparationNotice(null)}
               />
             )}
 
