@@ -27,46 +27,36 @@ export function LoginView({
   courses,
   onSelectCourse,
 }: LoginViewProps) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("student@recall.edu");
+  const [password, setPassword] = useState("student123");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleDemoSignIn = async (role: "student" | "instructor" | "admin") => {
+  const handleManualSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage("Please enter both institutional email and password.");
+      return;
+    }
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const resp = await recallApi.demoLogin(role, selectedCourseCode || "CS340");
+      const resp = await recallApi.login(email.trim(), password.trim());
       setStoredToken(resp.access_token);
       onLoginSuccess(resp.user);
     } catch (err: unknown) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Failed to sign in with demo credentials."
+        err instanceof Error ? err.message : "Invalid institutional credentials. Please check your email and password."
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleManualSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      setErrorMessage("Please enter both email and password.");
-      return;
-    }
-    setIsLoading(true);
+  const handleFillCredentials = (fillEmail: string, fillPass: string) => {
+    setEmail(fillEmail);
+    setPassword(fillPass);
     setErrorMessage(null);
-    try {
-      const resp = await recallApi.login(email.trim());
-      setStoredToken(resp.access_token);
-      onLoginSuccess(resp.user);
-    } catch (err: unknown) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Invalid credentials or unauthorized login."
-      );
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -80,22 +70,22 @@ export function LoginView({
           <div className="flex items-center gap-2 mt-1">
             <h1 className="text-3xl font-black text-ink tracking-tight">Recall</h1>
             <span className="tactile-tag bg-brand-yellow text-ink text-xs py-0.5 px-2">
-              AI MENTOR
+              PORTAL SIGN-IN
             </span>
           </div>
           <p className="text-sm font-medium text-ink-muted max-w-sm">
-            Course-aware adaptive learning platform with grounded Tutor and Revisor modes.
+            Course-aware adaptive learning platform with role-isolated Student, Instructor, and Admin workspaces.
           </p>
         </div>
 
         {/* Auth Box */}
-        <div className="tactile-card p-6 flex flex-col gap-6 bg-surface">
+        <div className="tactile-card p-6 flex flex-col gap-5 bg-surface">
           <div className="flex items-center justify-between border-b border-ink/10 pb-3">
             <span className="text-xs font-black uppercase tracking-wider text-ink">
-              Institutional Sign-In
+              Institutional Authentication
             </span>
             <span className="tactile-tag bg-brand-cyan/20 text-brand-cyan text-[10px]">
-              Secure Session
+              Session Protected
             </span>
           </div>
 
@@ -111,7 +101,7 @@ export function LoginView({
               <div className="flex items-center justify-between text-xs font-bold">
                 <span className="text-ink-muted flex items-center gap-1.5">
                   <BookOpen className="w-3.5 h-3.5 text-brand-cyan" />
-                  <span>Enrolled Course:</span>
+                  <span>Target Course:</span>
                 </span>
                 <span className="font-mono font-black text-brand-cyan bg-brand-cyan/15 px-1.5 py-0.5 rounded">
                   {selectedCourseCode}
@@ -134,68 +124,79 @@ export function LoginView({
             </div>
           )}
 
-          {/* 1-Click Demo Profiles */}
-          <div className="flex flex-col gap-2.5">
-            <label className="text-xs font-bold text-ink-muted">
-              Select Demo Identity:
-            </label>
-            <div className="grid grid-cols-3 gap-2">
+          {/* Showcase Credentials Selector */}
+          <div className="flex flex-col gap-2 p-3 bg-surface-warm/30 border-2 border-ink rounded-friendly-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-ink">
+                Demo Accounts &amp; Passwords:
+              </span>
+              <span className="text-[10px] text-ink-muted">Click to populate</span>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              {/* Student */}
               <button
-                id="btn-demo-student"
                 type="button"
-                onClick={() => handleDemoSignIn("student")}
-                disabled={isLoading}
-                className="tactile-btn-white flex flex-col items-start p-2.5 text-left hover:border-brand-yellow"
+                id="btn-fill-student"
+                onClick={() => handleFillCredentials("student@recall.edu", "student123")}
+                className={`p-2 border rounded text-left flex items-center justify-between text-xs transition-all ${
+                  email === "student@recall.edu"
+                    ? "bg-brand-yellow/30 border-ink font-bold shadow-hard-sm"
+                    : "bg-surface hover:bg-surface-warm border-ink/20 font-medium"
+                }`}
               >
-                <div className="flex items-center gap-1.5 text-xs font-black text-ink">
+                <div className="flex items-center gap-1.5">
                   <GraduationCap className="w-3.5 h-3.5 text-brand-yellow" />
-                  <span>Student</span>
+                  <span className="font-bold text-ink">Student:</span>
+                  <span className="font-mono text-[11px] text-ink-muted">student@recall.edu</span>
                 </div>
-                <span className="text-[10px] text-ink-muted font-medium mt-0.5 truncate w-full">
-                  Ada Lovelace
+                <span className="font-mono text-[10px] bg-brand-yellow px-1.5 py-0.5 rounded font-bold text-ink">
+                  student123
                 </span>
               </button>
 
+              {/* Teacher / Instructor */}
               <button
-                id="btn-demo-instructor"
                 type="button"
-                onClick={() => handleDemoSignIn("instructor")}
-                disabled={isLoading}
-                className="tactile-btn-white flex flex-col items-start p-2.5 text-left hover:border-brand-coral"
+                id="btn-fill-instructor"
+                onClick={() => handleFillCredentials("instructor@recall.edu", "instructor123")}
+                className={`p-2 border rounded text-left flex items-center justify-between text-xs transition-all ${
+                  email === "instructor@recall.edu"
+                    ? "bg-brand-coral/20 border-ink font-bold shadow-hard-sm"
+                    : "bg-surface hover:bg-surface-warm border-ink/20 font-medium"
+                }`}
               >
-                <div className="flex items-center gap-1.5 text-xs font-black text-ink">
+                <div className="flex items-center gap-1.5">
                   <UserCheck className="w-3.5 h-3.5 text-brand-coral" />
-                  <span>Instructor</span>
+                  <span className="font-bold text-ink">Teacher:</span>
+                  <span className="font-mono text-[11px] text-ink-muted">instructor@recall.edu</span>
                 </div>
-                <span className="text-[10px] text-ink-muted font-medium mt-0.5 truncate w-full">
-                  Prof. Faculty
+                <span className="font-mono text-[10px] bg-brand-coral text-white px-1.5 py-0.5 rounded font-bold">
+                  instructor123
                 </span>
               </button>
 
+              {/* Admin */}
               <button
-                id="btn-demo-admin"
                 type="button"
-                onClick={() => handleDemoSignIn("admin")}
-                disabled={isLoading}
-                className="tactile-btn-white flex flex-col items-start p-2.5 text-left hover:border-brand-green"
+                id="btn-fill-admin"
+                onClick={() => handleFillCredentials("admin@recall.edu", "admin123")}
+                className={`p-2 border rounded text-left flex items-center justify-between text-xs transition-all ${
+                  email === "admin@recall.edu"
+                    ? "bg-brand-green/20 border-ink font-bold shadow-hard-sm"
+                    : "bg-surface hover:bg-surface-warm border-ink/20 font-medium"
+                }`}
               >
-                <div className="flex items-center gap-1.5 text-xs font-black text-ink">
+                <div className="flex items-center gap-1.5">
                   <Shield className="w-3.5 h-3.5 text-brand-green" />
-                  <span>Admin</span>
+                  <span className="font-bold text-ink">Admin:</span>
+                  <span className="font-mono text-[11px] text-ink-muted">admin@recall.edu</span>
                 </div>
-                <span className="text-[10px] text-ink-muted font-medium mt-0.5 truncate w-full">
-                  Auditor Console
+                <span className="font-mono text-[10px] bg-brand-green text-ink px-1.5 py-0.5 rounded font-bold">
+                  admin123
                 </span>
               </button>
             </div>
-          </div>
-
-          <div className="relative flex py-1 items-center">
-            <div className="flex-grow border-t border-ink/10"></div>
-            <span className="flex-shrink mx-3 text-[10px] font-bold text-ink-faint uppercase">
-              Or password sign-in
-            </span>
-            <div className="flex-grow border-t border-ink/10"></div>
           </div>
 
           {/* Standard Login Form */}
@@ -206,11 +207,12 @@ export function LoginView({
                 <span>Institutional Email</span>
               </label>
               <input
+                id="input-login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="student.ada@recall.edu"
-                className="tactile-input text-xs"
+                placeholder="student@recall.edu"
+                className="tactile-input text-xs font-mono font-bold"
                 disabled={isLoading}
               />
             </div>
@@ -221,30 +223,36 @@ export function LoginView({
                 <span>Password</span>
               </label>
               <input
+                id="input-login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="tactile-input text-xs"
+                className="tactile-input text-xs font-mono font-bold"
                 disabled={isLoading}
               />
             </div>
 
             <button
+              id="btn-submit-login"
               type="submit"
               disabled={isLoading}
-              className="tactile-btn-yellow mt-2 py-2.5 text-xs font-black"
+              className="tactile-btn-yellow mt-2 py-2.5 text-xs font-black flex items-center justify-center gap-2"
             >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>{isLoading ? "Signing In..." : "Sign In to Recall"}</span>
+              <LogIn className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+              <span>{isLoading ? "Authenticating..." : "Sign In to Recall"}</span>
             </button>
           </form>
+
+          <p className="text-[10px] text-ink-muted text-center leading-tight">
+            Note: Changing roles requires signing out of your current session.
+          </p>
         </div>
 
         {/* Grounding Footer */}
         <div className="text-center text-[11px] font-medium text-ink-muted flex items-center justify-center gap-2">
           <Shield className="w-3.5 h-3.5 text-brand-green" />
-          <span>Syllabus Bound &bull; Deterministic Grader Authority</span>
+          <span>Institutional Role Separation &bull; Sign-Out Required to Switch</span>
         </div>
       </div>
     </div>

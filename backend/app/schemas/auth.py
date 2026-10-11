@@ -9,6 +9,7 @@ class LoginRequest(BaseModel):
     """Student or instructor login request."""
 
     email: EmailStr
+    password: str | None = None
 
 
 class DemoLoginRequest(BaseModel):

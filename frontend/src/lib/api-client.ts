@@ -111,10 +111,10 @@ export const recallApi = {
   getReadiness: () => fetchApi<ReadinessResponse>("/readyz"),
 
   // Authentication & Identity
-  login: (email: string) =>
+  login: (email: string, password?: string) =>
     fetchApi<TokenResponse>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, password }),
     }),
   demoLogin: (role: "student" | "instructor" | "admin" = "student", courseCode: string = "CS340") =>
     fetchApi<TokenResponse>("/auth/demo-login", {

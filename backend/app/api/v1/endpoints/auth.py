@@ -1,5 +1,6 @@
 """Authentication endpoints for session management, token issuance, and demo login."""
 
+from typing import Any
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,18 +18,104 @@ from app.schemas.identity import EnrollmentCreate, EnrollmentResponse, UserRespo
 router = APIRouter(prefix="/auth", tags=["Authentication & Identity"])
 
 
+DUMMY_CREDENTIALS: dict[str, dict[str, Any]] = {
+    "student@recall.edu": {
+        "password": "student123",
+        "full_name": "Ada Lovelace",
+        "role": UserRole.STUDENT,
+    },
+    "student.ada@recall.edu": {
+        "password": "student123",
+        "full_name": "Ada Lovelace",
+        "role": UserRole.STUDENT,
+    },
+    "instructor@recall.edu": {
+        "password": "instructor123",
+        "full_name": "Prof. E. F. Codd",
+        "role": UserRole.INSTRUCTOR,
+    },
+    "instructor.dbms@recall.edu": {
+        "password": "instructor123",
+        "full_name": "Prof. E. F. Codd",
+        "role": UserRole.INSTRUCTOR,
+    },
+    "instructor.os@recall.edu": {
+        "password": "instructor123",
+        "full_name": "Prof. Andrew Tanenbaum",
+        "role": UserRole.INSTRUCTOR,
+    },
+    "admin@recall.edu": {
+        "password": "admin123",
+        "full_name": "Auditor Ada (System Administrator)",
+        "role": UserRole.ADMIN,
+    },
+    "admin.audit@recall.edu": {
+        "password": "admin123",
+        "full_name": "Auditor Ada (System Administrator)",
+        "role": UserRole.ADMIN,
+    },
+}
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    """Passwordless email-only authentication is disabled to prevent privilege escalation."""
-    raise RecallException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        code="AUTHENTICATION_DISABLED",
-        title="Passwordless Login Disabled",
-        detail=(
-            "Passwordless email-only authentication is disabled to prevent unverified "
-            "privilege escalation. In development or demo environments, use "
-            "/api/v1/auth/demo-login."
-        ),
+    """Authenticate with institutional email and password."""
+    if not payload.password:
+        raise RecallException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            code="AUTHENTICATION_DISABLED",
+            title="Passwordless Login Disabled",
+            detail=(
+                "Passwordless email-only authentication is disabled to prevent unverified "
+                "privilege escalation. Provide a password to sign in."
+            ),
+        )
+
+    email_clean = payload.email.strip().lower()
+    creds = DUMMY_CREDENTIALS.get(email_clean)
+    if not creds or creds["password"] != payload.password:
+        raise RecallException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="INVALID_CREDENTIALS",
+            title="Invalid Credentials",
+            detail="Invalid institutional email or password.",
+        )
+
+    user_repo = UserRepository(db)
+    course_repo = CourseRepository(db)
+    enroll_repo = EnrollmentRepository(db)
+
+    user = await user_repo.get_by_email(email_clean)
+    if not user:
+        user = User(
+            email=email_clean,
+            full_name=creds["full_name"],
+            role=creds["role"],
+            is_active=True,
+        )
+        user = await user_repo.create(user)
+
+    # Ensure enrollment if student
+    if user.role == UserRole.STUDENT:
+        course = await course_repo.get_by_code("CS340")
+        if course:
+            existing = await enroll_repo.get_enrollment(user.id, course.id)
+            if not existing:
+                enrollment = CourseEnrollment(user_id=user.id, course_id=course.id, is_active=True)
+                await enroll_repo.create(enrollment)
+
+    token = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role.value,
+        expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+    )
+
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user=UserResponse.model_validate(user),
     )
 
 

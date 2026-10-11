@@ -103,156 +103,95 @@ export function Navbar({
             </select>
           </div>
 
-          {/* Dynamic Seed Active Course Button */}
-          <button
-            id="btn-seed-active-course"
-            onClick={() => onSeedCourse(selectedCourse?.code)}
-            disabled={isSeeding}
-            className="tactile-btn-white text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
-            title={`Seed ${selectedCourse?.code || "Current"} Curriculum & Knowledge Base`}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? "animate-spin" : ""}`} />
-            <span>{isSeeding ? "Seeding..." : `Seed ${selectedCourse ? selectedCourse.code : "Course"}`}</span>
-          </button>
+          {/* Dynamic Seed Course & Create Course Controls (Instructor & Admin Only) */}
+          {currentUser?.role !== "student" && (
+            <>
+              <button
+                id="btn-seed-active-course"
+                onClick={() => onSeedCourse(selectedCourse?.code)}
+                disabled={isSeeding}
+                className="tactile-btn-white text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
+                title={`Seed ${selectedCourse?.code || "Current"} Curriculum & Knowledge Base`}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? "animate-spin" : ""}`} />
+                <span>{isSeeding ? "Seeding..." : `Seed ${selectedCourse ? selectedCourse.code : "Course"}`}</span>
+              </button>
 
-          {/* Seed / Create New Course Trigger */}
-          <button
-            id="btn-seed-new-course"
-            onClick={() => setShowNewCourseModal(true)}
-            disabled={isSeeding}
-            className="tactile-btn-yellow text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
-            title="Seed a new or custom course"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ New Course</span>
-          </button>
+              <button
+                id="btn-seed-new-course"
+                onClick={() => setShowNewCourseModal(true)}
+                disabled={isSeeding}
+                className="tactile-btn-yellow text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
+                title="Seed a new or custom course"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ New Course</span>
+              </button>
+            </>
+          )}
 
-          {/* 1-Click Direct Role Switcher (Zero sign-out needed) */}
-          <div className="flex items-center bg-surface border-2 border-ink p-0.5 rounded-friendly-sm shadow-hard-sm">
-            <button
-              id="nav-role-student"
-              type="button"
-              onClick={() => onLoginDemo("student")}
-              className={`px-2 py-1 text-xs font-bold rounded flex items-center gap-1 transition-all ${
-                currentUser?.role === "student"
-                  ? "bg-brand-yellow text-ink shadow-hard-sm"
-                  : "text-ink-muted hover:text-ink hover:bg-surface-warm"
-              }`}
-              title="Switch directly to Student Mode"
-            >
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>Student</span>
-            </button>
-            <button
-              id="nav-role-instructor"
-              type="button"
-              onClick={() => onLoginDemo("instructor")}
-              className={`px-2 py-1 text-xs font-bold rounded flex items-center gap-1 transition-all ${
-                currentUser?.role === "instructor"
-                  ? "bg-brand-coral text-white shadow-hard-sm"
-                  : "text-ink-muted hover:text-ink hover:bg-surface-warm"
-              }`}
-              title="Switch directly to Instructor Mode"
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>Instructor</span>
-            </button>
-            <button
-              id="nav-role-admin"
-              type="button"
-              onClick={() => onLoginDemo("admin")}
-              className={`px-2 py-1 text-xs font-bold rounded flex items-center gap-1 transition-all ${
-                currentUser?.role === "admin"
-                  ? "bg-brand-green text-ink shadow-hard-sm"
-                  : "text-ink-muted hover:text-ink hover:bg-surface-warm"
-              }`}
-              title="Switch directly to Admin & Audit Mode"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Admin</span>
-            </button>
-          </div>
-
-          {/* User Auth Info & Switcher */}
+          {/* User Auth Profile & Sign Out (Mandatory sign-out to switch role) */}
           {currentUser ? (
-            <div className="relative">
-              <button
-                id="btn-user-profile"
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="tactile-btn-yellow text-xs py-1.5 px-3"
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>{currentUser.full_name}</span>
-                <span className="tactile-tag bg-surface text-ink text-[9px] py-0 px-1 ml-1 uppercase">
-                  {currentUser.role}
-                </span>
-              </button>
-
-              <button
-                id="btn-nav-logout"
-                onClick={onLogout}
-                title="Sign out of current session"
-                className="tactile-btn-white text-xs py-1.5 px-2.5 font-bold hover:!bg-brand-coral hover:!text-white"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </button>
-
-              {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-64 tactile-card p-3 z-50 flex flex-col gap-2">
-                  <div className="text-xs pb-2 border-b-2 border-ink/10">
-                    <div className="font-bold text-ink">{currentUser.full_name}</div>
-                    <div className="text-ink-muted text-[11px]">{currentUser.email}</div>
-                  </div>
-
-                  <div className="text-[11px] font-bold text-ink-muted uppercase tracking-wider pt-1">
-                    Switch Demo Identity
-                  </div>
-                  <button
-                    onClick={() => {
-                      onLoginDemo("student");
-                      setShowUserMenu(false);
-                    }}
-                    className="tactile-btn-white text-xs py-1 text-left justify-start"
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button
+                  id="btn-user-profile"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="tactile-btn-white text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
+                >
+                  <User className="w-3.5 h-3.5 text-ink-muted" />
+                  <span className="font-black text-ink">{currentUser.full_name}</span>
+                  <span
+                    className={`tactile-tag text-[9px] py-0 px-1.5 uppercase font-black ${
+                      currentUser.role === "admin"
+                        ? "bg-brand-green text-ink"
+                        : currentUser.role === "instructor"
+                        ? "bg-brand-coral text-white"
+                        : "bg-brand-yellow text-ink"
+                    }`}
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-brand-green" />
-                    <span>Demo Student (Ada Lovelace)</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onLoginDemo("instructor");
-                      setShowUserMenu(false);
-                    }}
-                    className="tactile-btn-white text-xs py-1 text-left justify-start"
-                  >
-                    <UserCheck className="w-3.5 h-3.5 text-brand-coral" />
-                    <span>Demo Instructor (Prof. Faculty)</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onLoginDemo("admin");
-                      setShowUserMenu(false);
-                    }}
-                    className="tactile-btn-white text-xs py-1 text-left justify-start"
-                  >
-                    <Shield className="w-3.5 h-3.5 text-brand-green" />
-                    <span>Demo Admin (Auditor Console)</span>
-                  </button>
+                    {currentUser.role}
+                  </span>
+                </button>
 
-                  <div className="pt-2 border-t-2 border-ink/10">
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 tactile-card p-3 z-50 flex flex-col gap-2">
+                    <div className="text-xs pb-2 border-b-2 border-ink/10">
+                      <div className="font-bold text-ink">{currentUser.full_name}</div>
+                      <div className="text-ink-muted text-[11px] truncate">{currentUser.email}</div>
+                      <div className="text-[10px] uppercase font-black text-ink-muted mt-1">
+                        Active Mode: {currentUser.role}
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-ink-muted leading-tight">
+                      To switch between Student, Instructor, and Admin modes, sign out below.
+                    </p>
+
                     <button
                       onClick={() => {
                         onLogout();
                         setShowUserMenu(false);
                       }}
-                      className="tactile-btn-coral text-xs py-1 w-full"
+                      className="tactile-btn-coral text-xs py-1.5 w-full font-black flex items-center justify-center gap-1.5"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Sign Out</span>
                     </button>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+
+              {/* Direct Sign Out Button */}
+              <button
+                id="btn-nav-logout"
+                onClick={onLogout}
+                title="Sign out to switch mode or exit"
+                className="tactile-btn-coral text-xs py-1.5 px-3 flex items-center gap-1.5 font-black hover:opacity-90"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
