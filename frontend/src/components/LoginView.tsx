@@ -11,15 +11,22 @@ import {
   Sparkles,
   UserCheck,
 } from "lucide-react";
+import { CourseResponse, UserResponse } from "../types";
 import { recallApi, setStoredToken } from "../lib/api-client";
-import { UserResponse } from "../types";
 
 interface LoginViewProps {
   onLoginSuccess: (user: UserResponse) => void;
   selectedCourseCode: string;
+  courses?: CourseResponse[];
+  onSelectCourse?: (course: CourseResponse) => void;
 }
 
-export function LoginView({ onLoginSuccess, selectedCourseCode }: LoginViewProps) {
+export function LoginView({
+  onLoginSuccess,
+  selectedCourseCode,
+  courses,
+  onSelectCourse,
+}: LoginViewProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -95,6 +102,35 @@ export function LoginView({ onLoginSuccess, selectedCourseCode }: LoginViewProps
           {errorMessage && (
             <div className="p-3 bg-brand-coral/15 border-2 border-brand-coral rounded-friendly-sm text-xs font-bold text-ink">
               {errorMessage}
+            </div>
+          )}
+
+          {/* Active Target Course Selection */}
+          {courses && courses.length > 0 && (
+            <div className="flex flex-col gap-1.5 p-3 bg-surface-warm/40 border border-ink/20 rounded-friendly-sm">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-ink-muted flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-brand-cyan" />
+                  <span>Enrolled Course:</span>
+                </span>
+                <span className="font-mono font-black text-brand-cyan bg-brand-cyan/15 px-1.5 py-0.5 rounded">
+                  {selectedCourseCode}
+                </span>
+              </div>
+              <select
+                value={selectedCourseCode}
+                onChange={(e) => {
+                  const found = courses.find((c) => c.code === e.target.value);
+                  if (found && onSelectCourse) onSelectCourse(found);
+                }}
+                className="tactile-select text-xs py-1.5 px-2 font-bold bg-white w-full cursor-pointer"
+              >
+                {courses.map((c) => (
+                  <option key={c.id} value={c.code}>
+                    {c.code} &mdash; {c.title}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 

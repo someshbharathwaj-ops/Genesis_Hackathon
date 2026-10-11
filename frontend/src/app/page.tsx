@@ -199,6 +199,8 @@ export default function HomePage() {
           setMentorMode("tutor");
         }}
         selectedCourseCode={selectedCourse?.code || "CS340"}
+        courses={courses}
+        onSelectCourse={handleSelectCourse}
       />
     );
   }
