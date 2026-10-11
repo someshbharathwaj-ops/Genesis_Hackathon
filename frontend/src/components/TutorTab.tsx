@@ -32,6 +32,7 @@ export function TutorTab({
   const isNetworks =
     course?.code.toUpperCase() === "CS305" ||
     course?.title.toLowerCase().includes("network");
+  const isDBMS = !isOS && !isNetworks;
 
   const sample1 = isOS
     ? "Can you explain deadlock conditions and prevention strategies?"
@@ -194,7 +195,7 @@ export function TutorTab({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-ink-muted">Quick Sample Inquiries:</label>
+              <label className="text-xs font-bold text-ink-muted">Sample Questions:</label>
               <div className="flex flex-col gap-1.5 text-xs">
                 <button
                   type="button"
@@ -210,6 +211,19 @@ export function TutorTab({
                 >
                   &quot;{sample2}&quot;
                 </button>
+                {isDBMS && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setQuery(
+                        "Consider a relation EMPLOYEE_DEPT (Emp_ID, Emp_Name, Dept_ID, Dept_Name) with PK Emp_ID and FDs: Emp_ID -> Emp_Name, Emp_ID -> Dept_ID, Dept_ID -> Dept_Name. Check if the above is in 3NF; if not, convert it into 3NF."
+                      )
+                    }
+                    className="p-2 border border-brand-yellow/50 rounded bg-brand-yellow/15 hover:bg-brand-yellow/25 text-left text-[11px] font-bold text-ink"
+                  >
+                    &quot;Check 3NF and decompose EMPLOYEE_DEPT&quot; (3NF Decomposition)
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setQuery("What are quantum algorithms for sorting data?")}
@@ -221,12 +235,12 @@ export function TutorTab({
             </div>
 
             <div className="flex flex-col gap-2 pt-2 border-t border-ink/10">
-              <label className="text-xs font-bold text-ink">Inquiry Prompt:</label>
+              <label className="text-xs font-bold text-ink">Your Question:</label>
               <textarea
-                rows={3}
+                rows={4}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Type question regarding course materials..."
+                placeholder="Ask an academic question regarding course materials..."
                 className="tactile-input text-xs"
               />
             </div>
@@ -237,7 +251,7 @@ export function TutorTab({
               className="tactile-btn-yellow text-xs py-2.5 font-black"
             >
               <Send className={`w-3.5 h-3.5 ${isAsking ? "animate-spin" : ""}`} />
-              <span>{isAsking ? "Retrieving & Generating..." : "Consult Grounded Tutor"}</span>
+              <span>{isAsking ? "Retrieving & Generating Answer..." : "Ask Recall Tutor"}</span>
             </button>
           </div>
         </div>
@@ -267,7 +281,7 @@ export function TutorTab({
                       HONEST ABSTENTION APPLIED (UNVERIFIED EVIDENCE)
                     </div>
                     <p className="text-xs text-ink font-medium mt-1">
-                      The Grounded Tutor abstained from answering this inquiry because official course
+                      The Grounded Tutor abstained from answering this question because official course
                       materials do not contain verified evidence for this concept.
                     </p>
                   </div>
@@ -277,11 +291,11 @@ export function TutorTab({
               {/* Structured Pedagogical Explanation */}
               <StructuredExplanation content={response.answer} />
 
-              {/* Verified Citations List */}
+              {/* Verified Sources List */}
               <div className="flex flex-col gap-2 pt-3 border-t border-ink/10">
-                <div className="text-xs font-bold text-ink-muted">Verified Source Citations:</div>
+                <div className="text-xs font-bold text-ink-muted">Course Sources:</div>
                 {(!response.citations || response.citations.length === 0) ? (
-                  <span className="text-xs text-ink-faint italic">No citations available.</span>
+                  <span className="text-xs text-ink-faint italic">No sources cited.</span>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {response.citations.map((c, i) => (
@@ -312,10 +326,9 @@ export function TutorTab({
           ) : (
             <div className="tactile-card p-12 text-center text-ink-muted flex flex-col items-center justify-center gap-2 min-h-[280px]">
               <MessageSquare className="w-8 h-8 text-ink-faint" />
-              <div className="font-bold text-sm">Awaiting Student Query</div>
+              <div className="font-bold text-sm">Awaiting Student Question</div>
               <p className="text-xs max-w-sm font-medium">
-                Ask a concept question on the left to observe syllabus retrieval, grounded source
-                citations, and abstention rules.
+                Ask an academic question on the left to receive grounded explanations and course sources.
               </p>
             </div>
           )}

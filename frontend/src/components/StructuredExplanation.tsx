@@ -43,6 +43,10 @@ function sanitizeRawText(raw: string): string {
     cleaned = cleaned.replace(pat, "");
   }
 
+  // Ensure headers have newlines and strip trailing hashes
+  cleaned = cleaned.replace(/([^\n])\s*(#{2,6}\s+)/g, "$1\n\n$2");
+  cleaned = cleaned.replace(/^(#{2,6}\s+[^\n#]+?)\s*#+\s*$/gm, "$1");
+
   // 2. Unicode arrows
   cleaned = cleaned.replace(/->/g, " → ").replace(/-->/g, " → ");
 
@@ -56,8 +60,9 @@ function sanitizeRawText(raw: string): string {
 function extractBulletPoints(textBlock: string): StructuredPoint[] {
   const points: StructuredPoint[] = [];
 
-  // Split on newlines or explicit bullet/numbered markers
-  const rawLines = textBlock.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  // Clean trailing hashes
+  const cleanBlock = textBlock.replace(/#+/g, "");
+  const rawLines = cleanBlock.split(/\n+/).map((l) => l.trim()).filter(Boolean);
 
   for (const line of rawLines) {
     // Check if line starts with bullet marker or number (e.g. "1. Reflexivity: ...", "• Rule 1: ...", "- Item")
@@ -140,7 +145,12 @@ function isFillerSentence(sentence: string): boolean {
     lower.includes("since the excerpts do not provide explicit") ||
     lower.includes("i cannot directly cite the source") ||
     lower.includes("in accordance with recall's grounding policy") ||
-    lower.includes("as mentioned in the provided excerpts")
+    lower.includes("as mentioned in the provided excerpts") ||
+    lower.includes("consider a representative instance conforming to the rules above") ||
+    lower.includes("direct answer #") ||
+    lower.includes("core concept #") ||
+    lower.includes("step by step breakdown #") ||
+    lower.includes("worked example #")
   );
 }
 
@@ -160,20 +170,25 @@ export function StructuredExplanation({ content }: StructuredExplanationProps) {
       if (!trimmed) continue;
 
       const lines = trimmed.split("\n");
-      const title = lines[0].replace(/^###?\s+/, "").trim();
+      const rawTitle = lines[0].replace(/^#+\s*/, "").replace(/\s*#+$/, "").trim();
+      const cleanTitle = rawTitle
+        .replace(/#+/g, "")
+        .replace(/^(?:[📌🔍⚙️💡⚠️📝📚]\s*)+/, "")
+        .replace(/\s*:\s*$/, "")
+        .trim();
       const body = lines.slice(1).join("\n").trim();
 
-      const lower = title.toLowerCase();
+      const lower = cleanTitle.toLowerCase();
       let type: ParsedSection["type"] = "general";
-      if (lower.includes("direct") || lower.includes("concept") || lower.includes("glance")) type = "concept";
-      else if (lower.includes("rule") || lower.includes("breakdown") || lower.includes("step")) type = "rules";
+      if (lower.includes("verdict") || lower.includes("direct") || lower.includes("concept") || lower.includes("glance")) type = "concept";
+      else if (lower.includes("rule") || lower.includes("breakdown") || lower.includes("step") || lower.includes("decomposition") || lower.includes("violation") || lower.includes("key") || lower.includes("analysis")) type = "rules";
       else if (lower.includes("example") || lower.includes("worked")) type = "example";
       else if (lower.includes("misconception") || lower.includes("mistake") || lower.includes("fallacy")) type = "misconception";
-      else if (lower.includes("takeaway") || lower.includes("summary")) type = "takeaway";
+      else if (lower.includes("takeaway") || lower.includes("summary") || lower.includes("properties") || lower.includes("source")) type = "takeaway";
 
-      const points = extractBulletPoints(body || title);
+      const points = extractBulletPoints(body || cleanTitle);
       if (points.length > 0) {
-        sections.push({ title, type, points });
+        sections.push({ title: cleanTitle, type, points });
       }
     }
   } else {
