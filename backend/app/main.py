@@ -58,9 +58,14 @@ def create_application() -> FastAPI:
         if isinstance(settings.ALLOWED_ORIGINS, list)
         else [settings.ALLOWED_ORIGINS]
     )
+    origin_regex = settings.ALLOWED_ORIGIN_REGEX
+    if origin_regex is None and settings.ENVIRONMENT.lower() != "production":
+        origin_regex = r"^https?://.*$"
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
+        allow_origin_regex=origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
