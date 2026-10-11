@@ -3,7 +3,9 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user, verify_course_access, verify_student_ownership
 from app.core.database import get_db
+from app.models.identity import User
 from app.schemas.scheduling import (
     PlanRetentionSessionRequest,
     RetentionSessionPlanResponse,
@@ -30,8 +32,11 @@ async def get_review_queue(
         default=None,
         description="Override working memory cooldown in seconds (defaults to 3600.0s).",
     ),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> ReviewQueueResponse:
+    verify_student_ownership(current_user, student_id)
+    await verify_course_access(course_id, current_user, session)
     service = SchedulingService(session)
     return await service.get_student_review_queue(
         course_id=course_id,
@@ -57,8 +62,11 @@ async def plan_retention_session(
         default=None,
         description="Override working memory cooldown in seconds.",
     ),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> RetentionSessionPlanResponse:
+    verify_student_ownership(current_user, student_id)
+    await verify_course_access(course_id, current_user, session)
     service = SchedulingService(session)
     return await service.plan_retention_session(
         course_id=course_id,

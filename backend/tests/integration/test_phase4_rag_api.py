@@ -3,11 +3,18 @@
 import pytest
 from httpx import AsyncClient
 
+from tests.auth_utils import create_authenticated_user
+
 
 @pytest.mark.integration
 async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncClient) -> None:
+    # 0. Authenticate admin user
+    _, admin_hdr = await create_authenticated_user(
+        async_client, "admin.phase4@recall.edu", "Admin P4", "admin"
+    )
+
     # 1. Seed courses
-    seed_resp = await async_client.post("/api/v1/courses/seed/dbms")
+    seed_resp = await async_client.post("/api/v1/courses/seed/dbms", headers=admin_hdr)
     assert seed_resp.status_code == 201
     course_id = seed_resp.json()["course_id"]
 
@@ -38,6 +45,7 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     upload_resp = await async_client.post(
         f"/api/v1/courses/{course_id}/documents/upload",
         files={"file": ("dbms_lecture1.txt", doc_text.encode("utf-8"), "text/plain")},
+        headers=admin_hdr,
     )
     assert upload_resp.status_code == 201
     doc_data = upload_resp.json()
@@ -49,6 +57,7 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     reupload_resp = await async_client.post(
         f"/api/v1/courses/{course_id}/documents/upload",
         files={"file": ("dbms_lecture1.txt", doc_text.encode("utf-8"), "text/plain")},
+        headers=admin_hdr,
     )
     assert reupload_resp.status_code == 201
     reupload_data = reupload_resp.json()
@@ -56,7 +65,10 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     assert reupload_data["chunk_count"] == doc_data["chunk_count"]
 
     # Verify document list count remains 1
-    list_docs_resp = await async_client.get(f"/api/v1/courses/{course_id}/documents")
+    list_docs_resp = await async_client.get(
+        f"/api/v1/courses/{course_id}/documents",
+        headers=admin_hdr,
+    )
     assert list_docs_resp.status_code == 200
     docs_list = list_docs_resp.json()
     assert len(docs_list) == 1
@@ -68,6 +80,7 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     upload_course2_resp = await async_client.post(
         f"/api/v1/courses/{course2_id}/documents/upload",
         files={"file": ("os_lecture1.txt", os_doc_text.encode("utf-8"), "text/plain")},
+        headers=admin_hdr,
     )
     assert upload_course2_resp.status_code == 201
     assert upload_course2_resp.json()["id"] is not None
@@ -77,6 +90,7 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     retrieval_resp = await async_client.post(
         f"/api/v1/courses/{course_id}/knowledge/retrieve",
         json={"query": "What are Armstrong's axioms and transitivity?", "top_k": 3},
+        headers=admin_hdr,
     )
     assert retrieval_resp.status_code == 200
     ret_data = retrieval_resp.json()
@@ -94,6 +108,7 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     os_retrieval_resp = await async_client.post(
         f"/api/v1/courses/{course2_id}/knowledge/retrieve",
         json={"query": "Virtual memory and page replacement", "top_k": 3},
+        headers=admin_hdr,
     )
     assert os_retrieval_resp.status_code == 200
     os_ret_data = os_retrieval_resp.json()
@@ -109,6 +124,7 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
             "query": "Mitochondria cellular respiration in eukaryotic cells",
             "similarity_threshold": 0.60,
         },
+        headers=admin_hdr,
     )
     assert irrelevant_resp.status_code == 200
     irrel_data = irrelevant_resp.json()
@@ -118,7 +134,8 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
 
     # 7. Document detail endpoint
     detail_resp = await async_client.get(
-        f"/api/v1/courses/{course_id}/documents/{doc_id}"
+        f"/api/v1/courses/{course_id}/documents/{doc_id}",
+        headers=admin_hdr,
     )
     assert detail_resp.status_code == 200
     detail_data = detail_resp.json()
@@ -130,6 +147,7 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     bad_pdf_resp = await async_client.post(
         f"/api/v1/courses/{course_id}/documents/upload",
         files={"file": ("corrupt.pdf", b"%PDF-corrupt-data-not-a-real-pdf", "application/pdf")},
+        headers=admin_hdr,
     )
     assert bad_pdf_resp.status_code == 422
     assert bad_pdf_resp.json()["code"] == "DOCUMENT_EXTRACTION_ERROR"
@@ -138,15 +156,22 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     unsupported_resp = await async_client.post(
         f"/api/v1/courses/{course_id}/documents/upload",
         files={"file": ("archive.zip", b"PK\x03\x04...", "application/zip")},
+        headers=admin_hdr,
     )
     assert unsupported_resp.status_code == 415
     assert unsupported_resp.json()["code"] == "UNSUPPORTED_DOCUMENT_FORMAT"
 
     # 9. Delete document
-    del_resp = await async_client.delete(f"/api/v1/courses/{course_id}/documents/{doc_id}")
+    del_resp = await async_client.delete(
+        f"/api/v1/courses/{course_id}/documents/{doc_id}",
+        headers=admin_hdr,
+    )
     assert del_resp.status_code == 204
 
     # Verification: document list is now empty
-    empty_list_resp = await async_client.get(f"/api/v1/courses/{course_id}/documents")
+    empty_list_resp = await async_client.get(
+        f"/api/v1/courses/{course_id}/documents",
+        headers=admin_hdr,
+    )
     assert empty_list_resp.status_code == 200
     assert len(empty_list_resp.json()) == 0

@@ -102,6 +102,26 @@ def decode_access_token(token: str) -> dict[str, Any]:
 
     header_b64, payload_b64, sig_b64 = parts
 
+    try:
+        header_bytes = _b64url_decode(header_b64)
+        header = json.loads(header_bytes.decode("utf-8"))
+        if not isinstance(header, dict) or header.get("alg") != "HS256":
+            raise RecallException(
+                status_code=401,
+                code="UNAUTHORIZED",
+                title="Invalid Token",
+                detail="Unsupported or invalid token algorithm (expected HS256).",
+            )
+    except Exception as exc:
+        if isinstance(exc, RecallException):
+            raise
+        raise RecallException(
+            status_code=401,
+            code="UNAUTHORIZED",
+            title="Invalid Token",
+            detail="Token header is malformed.",
+        ) from exc
+
     signing_input = f"{header_b64}.{payload_b64}".encode()
     expected_sig = hmac.new(
         settings.SECRET_KEY.encode(),
@@ -122,6 +142,8 @@ def decode_access_token(token: str) -> dict[str, Any]:
     try:
         payload_bytes = _b64url_decode(payload_b64)
         payload = json.loads(payload_bytes.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("Payload must be a JSON object.")
     except Exception as exc:
         raise RecallException(
             status_code=401,
@@ -130,13 +152,40 @@ def decode_access_token(token: str) -> dict[str, Any]:
             detail=f"Failed to decode token payload: {exc}",
         ) from exc
 
+    # Enforce mandatory expiration claim (exp)
     exp = payload.get("exp")
-    if exp is not None and int(exp) < int(time.time()):
+    if exp is None:
+        raise RecallException(
+            status_code=401,
+            code="UNAUTHORIZED",
+            title="Invalid Token",
+            detail="Token is missing mandatory expiration claim (exp).",
+        )
+    try:
+        exp_int = int(exp)
+    except (ValueError, TypeError) as exc:
+        raise RecallException(
+            status_code=401,
+            code="UNAUTHORIZED",
+            title="Invalid Token",
+            detail="Token contains malformed expiration claim.",
+        ) from exc
+
+    if exp_int < int(time.time()):
         raise RecallException(
             status_code=401,
             code="UNAUTHORIZED",
             title="Token Expired",
             detail="Authentication token has expired. Please log in again.",
+        )
+
+    # Enforce subject claim (sub)
+    if not payload.get("sub"):
+        raise RecallException(
+            status_code=401,
+            code="UNAUTHORIZED",
+            title="Invalid Token",
+            detail="Token is missing required subject claim (sub).",
         )
 
     return payload

@@ -7,7 +7,14 @@ from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import create_access_token
 from app.models.question import QuestionVersion
+
+
+def _auth(user_id: str, email: str = "test@recall.edu", role: str = "student") -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {create_access_token(user_id=user_id, email=email, role=role)}"
+    }
 
 
 @pytest.mark.integration
@@ -125,7 +132,7 @@ async def test_full_phase1_lifecycle_and_idempotency(async_client: AsyncClient) 
     att_resp = await async_client.post(
         "/api/v1/attempts",
         json=attempt_payload,
-        headers={"Idempotency-Key": idem_key},
+        headers={"Idempotency-Key": idem_key, **_auth(student_id, student["email"])},
     )
     assert att_resp.status_code == 201
     attempt = att_resp.json()
@@ -138,7 +145,7 @@ async def test_full_phase1_lifecycle_and_idempotency(async_client: AsyncClient) 
     replay_resp = await async_client.post(
         "/api/v1/attempts",
         json=attempt_payload,
-        headers={"Idempotency-Key": idem_key},
+        headers={"Idempotency-Key": idem_key, **_auth(student_id, student["email"])},
     )
     assert replay_resp.status_code == 200
     replayed = replay_resp.json()
@@ -158,7 +165,7 @@ async def test_full_phase1_lifecycle_and_idempotency(async_client: AsyncClient) 
     conflict_resp = await async_client.post(
         "/api/v1/attempts",
         json=conflict_payload,
-        headers={"Idempotency-Key": idem_key},
+        headers={"Idempotency-Key": idem_key, **_auth(student_id, student["email"])},
     )
     assert conflict_resp.status_code == 409
     assert conflict_resp.headers["content-type"] == "application/problem+json"
@@ -222,7 +229,7 @@ async def test_attempt_with_hint_penalty_and_repetition_discount(
             "hint_count": 2,
             "time_spent_ms": 30000,
         },
-        headers={"Idempotency-Key": "hint-att-001"},
+        headers={"Idempotency-Key": "hint-att-001", **_auth(student_id, "student2@recall.edu")},
     )
     assert att_resp.status_code == 201
     att = att_resp.json()
@@ -243,7 +250,7 @@ async def test_attempt_with_hint_penalty_and_repetition_discount(
             "hint_count": 0,
             "time_spent_ms": 15000,
         },
-        headers={"Idempotency-Key": "repeat-att-002"},
+        headers={"Idempotency-Key": "repeat-att-002", **_auth(student_id, "student2@recall.edu")},
     )
     assert att_resp2.status_code == 201
     att2 = att_resp2.json()
@@ -304,7 +311,10 @@ async def test_attempt_fails_when_no_verified_version_exists(
             "submitted_answer": {"value": "draft"},
             "assessment_context": "diagnostic",
         },
-        headers={"Idempotency-Key": "unverified-att-001"},
+        headers={
+            "Idempotency-Key": "unverified-att-001",
+            **_auth(student_id, "student3@recall.edu"),
+        },
     )
     assert att_resp.status_code == 422
     err_body = att_resp.json()
@@ -362,6 +372,7 @@ async def test_identity_and_course_conflict_and_queries(
     enroll_resp = await async_client.post(
         f"/api/v1/courses/{first_course_id}/enroll",
         json={"user_id": first_user_id, "course_id": first_course_id},
+        headers=_auth(first_user_id),
     )
     assert enroll_resp.status_code == 201
 
@@ -369,6 +380,7 @@ async def test_identity_and_course_conflict_and_queries(
     re_enroll = await async_client.post(
         f"/api/v1/courses/{first_course_id}/enroll",
         json={"user_id": first_user_id, "course_id": first_course_id},
+        headers=_auth(first_user_id),
     )
     assert re_enroll.status_code == 201
 
@@ -376,13 +388,23 @@ async def test_identity_and_course_conflict_and_queries(
     assert (await async_client.get("/api/v1/users/nonexistent-user")).status_code == 404
     assert (await async_client.get("/api/v1/courses/nonexistent-course")).status_code == 404
     assert (await async_client.get("/api/v1/questions/nonexistent-q")).status_code == 404
-    assert (await async_client.get("/api/v1/attempts/nonexistent-att")).status_code == 404
+    assert (
+        await async_client.get("/api/v1/attempts/nonexistent-att", headers=_auth(first_user_id))
+    ).status_code == 404
 
 
 @pytest.mark.integration
 async def test_seed_dbms_curriculum_and_idempotency(async_client: AsyncClient) -> None:
+    # 0. Setup admin user for seeding
+    adm_resp = await async_client.post(
+        "/api/v1/users",
+        json={"email": "seed_admin@recall.edu", "full_name": "Seed Admin", "role": "admin"},
+    )
+    adm_id = adm_resp.json()["id"]
+    adm_hdr = _auth(adm_id, "seed_admin@recall.edu", role="admin")
+
     # 1. First seeding creates the course, topic, 5 objectives, and catalog questions
-    seed_resp = await async_client.post("/api/v1/courses/seed/dbms")
+    seed_resp = await async_client.post("/api/v1/courses/seed/dbms", headers=adm_hdr)
     assert seed_resp.status_code == 201
     data = seed_resp.json()
     assert data["status"] == "success"
@@ -390,7 +412,7 @@ async def test_seed_dbms_curriculum_and_idempotency(async_client: AsyncClient) -
     assert data["new_questions_seeded"] >= 8
 
     # 2. Second seeding is strictly idempotent (0 new questions created)
-    re_seed_resp = await async_client.post("/api/v1/courses/seed/dbms")
+    re_seed_resp = await async_client.post("/api/v1/courses/seed/dbms", headers=adm_hdr)
     assert re_seed_resp.status_code == 201
     re_data = re_seed_resp.json()
     assert re_data["status"] == "success"
@@ -455,7 +477,10 @@ async def test_question_version_with_attempts_cannot_be_deleted(
             "submitted_answer": {"value": "A"},
             "assessment_context": "diagnostic",
         },
-        headers={"Idempotency-Key": "restrict-test-att-001"},
+        headers={
+            "Idempotency-Key": "restrict-test-att-001",
+            **_auth(student_id, "restrict_test@recall.edu"),
+        },
     )
     assert att_resp.status_code == 201
 
@@ -537,7 +562,7 @@ async def test_idempotency_database_unique_constraint_and_replay(
     first_resp = await async_client.post(
         "/api/v1/attempts",
         json=payload,
-        headers={"Idempotency-Key": shared_key},
+        headers={"Idempotency-Key": shared_key, **_auth(student_id, "concurrent_test@recall.edu")},
     )
     assert first_resp.status_code == 201
     attempt_id = first_resp.json()["id"]
@@ -546,7 +571,7 @@ async def test_idempotency_database_unique_constraint_and_replay(
     replay_resp = await async_client.post(
         "/api/v1/attempts",
         json=payload,
-        headers={"Idempotency-Key": shared_key},
+        headers={"Idempotency-Key": shared_key, **_auth(student_id, "concurrent_test@recall.edu")},
     )
     assert replay_resp.status_code == 200
     assert replay_resp.json()["id"] == attempt_id
@@ -575,7 +600,10 @@ async def test_idempotency_database_unique_constraint_and_replay(
             await test_db_session.flush()
 
     # 5. Verify total student attempts remains exactly 1
-    student_atts = await async_client.get(f"/api/v1/attempts/student/{student_id}")
+    student_atts = await async_client.get(
+        f"/api/v1/attempts/student/{student_id}",
+        headers=_auth(student_id, "concurrent_test@recall.edu"),
+    )
     assert student_atts.status_code == 200
     assert len(student_atts.json()) == 1
 
@@ -846,6 +874,3 @@ async def test_cross_topic_duplicate_code_ambiguity_and_uuid_resolution(
         },
     )
     assert res_b_resp.status_code == 201
-
-
-

@@ -1,6 +1,6 @@
 """Application configuration loaded from environment variables."""
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,9 +43,9 @@ class Settings(BaseSettings):
         default="http://localhost:11434",
         description="Ollama service base endpoint",
     )
-    PRIMARY_MODEL: str = Field(default="qwen2.5:3b", description="Primary bounded language model")
+    PRIMARY_MODEL: str = Field(default="phi3:mini", description="Primary bounded language model")
     EMBEDDING_MODEL: str = Field(default="nomic-embed-text", description="Vector embedding model")
-    LLM_TIMEOUT_SECONDS: float = Field(default=15.0, description="Strict LLM inference timeout")
+    LLM_TIMEOUT_SECONDS: float = Field(default=45.0, description="Strict LLM inference timeout")
     USE_MOCK_LLM: bool = Field(
         default=True,
         description="Whether to use mock LLM provider for deterministic tests",
@@ -61,6 +61,23 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if self.ENVIRONMENT.lower() == "production":
+            insecure_defaults = {
+                "dev_secret_key_change_in_production_min_32_chars_12345",
+                "secret",
+                "changeme",
+                "insecure",
+            }
+            if self.SECRET_KEY in insecure_defaults or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "Insecure or default SECRET_KEY is not permitted in production. "
+                    "Provide a strong secret key (at least 32 characters) via the "
+                    "SECRET_KEY environment variable."
+                )
+        return self
 
 
 settings = Settings()

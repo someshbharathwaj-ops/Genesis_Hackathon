@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.errors import RecallException, ResourceNotFoundError
 from app.core.security import decode_access_token
-from app.models.identity import User, UserRole
+from app.models.identity import Course, User, UserRole
 from app.repositories.course_repo import CourseRepository
 from app.repositories.user_repo import EnrollmentRepository, UserRepository
 
@@ -89,21 +89,31 @@ async def get_optional_current_user(
         return None
 
 
-async def verify_course_enrollment(
+async def verify_course_access(
     course_id: str,
     user: User,
     db: AsyncSession,
-) -> None:
-    """Ensure user is enrolled in course or has instructor/admin privileges."""
-    # Instructors and admins have universal course access
-    if user.role in (UserRole.INSTRUCTOR, UserRole.ADMIN):
-        return
-
+) -> Course:
+    """Ensure user is enrolled in course or is an authorized instructor/admin."""
     course_repo = CourseRepository(db)
     course = await course_repo.get_by_id(course_id)
     if not course:
         raise ResourceNotFoundError("Course", course_id)
 
+    if user.role == UserRole.ADMIN:
+        return course
+
+    if user.role == UserRole.INSTRUCTOR:
+        if course.instructor_id is not None and course.instructor_id != user.id:
+            raise RecallException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="FORBIDDEN",
+                title="Course Access Denied",
+                detail=f"Instructor '{user.full_name}' is not assigned to course '{course.code}'.",
+            )
+        return course
+
+    # Student verification
     enroll_repo = EnrollmentRepository(db)
     enrollment = await enroll_repo.get_enrollment(user.id, course_id)
     if not enrollment or not enrollment.is_active:
@@ -113,6 +123,50 @@ async def verify_course_enrollment(
             title="Course Access Denied",
             detail=f"Student '{user.full_name}' is not enrolled in course '{course.code}'.",
         )
+    return course
+
+
+# Alias for backwards compatibility
+verify_course_enrollment = verify_course_access
+
+
+def require_instructor_or_admin(user: User) -> None:
+    """Enforce that current user has instructor or administrator privileges."""
+    if user.role not in (UserRole.INSTRUCTOR, UserRole.ADMIN):
+        raise RecallException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="FORBIDDEN",
+            title="Insufficient Permissions",
+            detail="This operation requires instructor or administrator privileges.",
+        )
+
+
+async def verify_instructor_course_access(
+    course_id: str,
+    user: User,
+    db: AsyncSession,
+) -> Course:
+    """Ensure user is instructor assigned to the course or an administrator."""
+    require_instructor_or_admin(user)
+
+    course_repo = CourseRepository(db)
+    course = await course_repo.get_by_id(course_id)
+    if not course:
+        raise ResourceNotFoundError("Course", course_id)
+
+    if user.role == UserRole.ADMIN:
+        return course
+
+    if course.instructor_id is not None and course.instructor_id != user.id:
+        raise RecallException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="FORBIDDEN",
+            title="Forbidden",
+            detail=(
+                f"Instructor '{user.full_name}' is not assigned to manage course '{course.code}'."
+            ),
+        )
+    return course
 
 
 def verify_student_ownership(current_user: User, requested_student_id: str) -> None:

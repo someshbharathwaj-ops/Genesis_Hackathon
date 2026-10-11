@@ -5,6 +5,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attempt import AssessmentContext, Attempt, AttemptStatus
+from tests.auth_utils import create_authenticated_user
 
 
 @pytest.mark.integration
@@ -12,21 +13,26 @@ async def test_phase6_revisor_api_lifecycle(
     async_client: AsyncClient,
     test_db_session: AsyncSession,
 ) -> None:
-    # 1. Seed courses and create student
-    seed_resp = await async_client.post("/api/v1/courses/seed/dbms")
+    # 0. Setup admin and student
+    admin_user, admin_hdr = await create_authenticated_user(
+        async_client, "admin@recall.edu", "Admin User", "admin"
+    )
+    student_user, student_hdr = await create_authenticated_user(
+        async_client, "revisor_student@university.edu", "Revisor Student", "student"
+    )
+    student_id = student_user["id"]
+
+    # 1. Seed courses and enroll student
+    seed_resp = await async_client.post("/api/v1/courses/seed/dbms", headers=admin_hdr)
     assert seed_resp.status_code == 201
     course_id = seed_resp.json()["course_id"]
 
-    user_resp = await async_client.post(
-        "/api/v1/users",
-        json={
-            "email": "revisor_student@university.edu",
-            "full_name": "Revisor Student",
-            "role": "student",
-        },
+    enroll_resp = await async_client.post(
+        f"/api/v1/courses/{course_id}/enroll",
+        json={"user_id": student_id, "course_id": course_id},
+        headers=admin_hdr,
     )
-    assert user_resp.status_code == 201
-    student_id = user_resp.json()["id"]
+    assert enroll_resp.status_code in (200, 201)
 
     # 2. Ingest course document for DBMS
     doc_text = (
@@ -41,6 +47,7 @@ async def test_phase6_revisor_api_lifecycle(
     upload_resp = await async_client.post(
         f"/api/v1/courses/{course_id}/documents/upload",
         files={"file": ("dbms_lecture1.txt", doc_text.encode("utf-8"), "text/plain")},
+        headers=admin_hdr,
     )
     assert upload_resp.status_code == 201
 
@@ -56,6 +63,7 @@ async def test_phase6_revisor_api_lifecycle(
             ),
             "query_or_topic": "Armstrong axioms and functional dependencies",
         },
+        headers=student_hdr,
     )
     assert grounded_review_resp.status_code == 200
     rev_data = grounded_review_resp.json()
@@ -74,6 +82,7 @@ async def test_phase6_revisor_api_lifecycle(
             ),
             "query_or_topic": "Functional dependencies",
         },
+        headers=student_hdr,
     )
     assert ungrounded_review_resp.status_code == 200
     ungrounded_data = ungrounded_review_resp.json()
@@ -90,6 +99,7 @@ async def test_phase6_revisor_api_lifecycle(
             "query_or_topic": "Functional dependencies and closure",
             "check_deterministic_logic": True,
         },
+        headers=student_hdr,
     )
     assert contradiction_resp.status_code == 200
     contra_data = contradiction_resp.json()
@@ -102,11 +112,10 @@ async def test_phase6_revisor_api_lifecycle(
         f"/api/v1/courses/{course_id}/revisor/review",
         json={
             "student_id": student_id,
-            "candidate_text": (
-                "Photosynthesis occurs in chloroplasts using thylakoid membranes."
-            ),
+            "candidate_text": ("Photosynthesis occurs in chloroplasts using thylakoid membranes."),
             "query_or_topic": "Photosynthesis and cellular biology",
         },
+        headers=student_hdr,
     )
     assert abstain_resp.status_code == 200
     abstain_data = abstain_resp.json()
@@ -151,6 +160,7 @@ async def test_phase6_revisor_api_lifecycle(
             "candidate_text": "Armstrong reflexivity allows trivial dependencies.",
             "query_or_topic": "Armstrong axioms",
         },
+        headers=student_hdr,
     )
     assert locked_resp.status_code == 403
     lock_err = locked_resp.json()
