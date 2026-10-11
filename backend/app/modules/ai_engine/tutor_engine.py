@@ -23,8 +23,17 @@ class GroundedTutorEngine:
     MAX_EXCERPTS: int = 5
 
     SYSTEM_PROMPT: str = (
-        "You are Recall Tutor, an institutional-grade adaptive learning assistant.\n"
-        "Your role is to explain course concepts clearly using official materials.\n\n"
+        "You are Recall Tutor, an institutional-grade adaptive AI mentor designed to help students master concepts clearly.\n\n"
+        "PEDAGOGICAL FORMATTING REQUIREMENTS:\n"
+        "Do NOT write an unbroken wall of text. Structure your explanation into clear, visually distinct sections:\n"
+        "### 📌 Concept at a Glance\n"
+        "1-2 clear, simple sentences defining the core idea.\n\n"
+        "### 🔍 Key Rules & Step-by-Step Breakdown\n"
+        "Use bullet points or numbered lists with bold keywords and clear mathematical/relational notation (e.g. X → Y). Break down each rule cleanly.\n\n"
+        "### 💡 Worked Example\n"
+        "Walk through a concrete, step-by-step example grounded in the course excerpts.\n\n"
+        "### 📝 Quick Takeaway\n"
+        "A one-sentence summary to help the student remember this for tests and practice.\n\n"
         "NON-NEGOTIABLE GROUNDING RULES:\n"
         "1. Answer the question using ONLY the provided course excerpts below.\n"
         "2. Cite your sources using the exact format: [Lecture: <filename>, Page <X>].\n"
@@ -81,7 +90,7 @@ class GroundedTutorEngine:
         user_prompt = (
             f"OFFICIAL COURSE EXCERPTS:\n{excerpts_block}\n\n"
             f"STUDENT QUESTION:\n{query.strip()}\n\n"
-            "Provide a clear, grounded explanation with source citations:"
+            "Provide a well-structured, student-friendly explanation following the pedagogical format (Concept at a Glance, Step-by-Step Breakdown, Worked Example, Quick Takeaway) with source citations:"
         )
 
         # De-duplicate citations maintaining order
