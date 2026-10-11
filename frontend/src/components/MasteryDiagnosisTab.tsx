@@ -110,14 +110,16 @@ export function MasteryDiagnosisTab({
       <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="tactile-card p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs font-bold text-ink-muted">
-            <span>Course Mastery Index</span>
+            <span>Course Performance Index</span>
             <TrendingUp className="w-4 h-4 text-brand-green" />
           </div>
           <div className="text-3xl font-black text-ink mt-2">
-            {masterySummary ? `${(masterySummary.course_mastery_index * 100).toFixed(0)}%` : "0%"}
+            {masterySummary
+              ? `${((masterySummary.average_performance ?? masterySummary.course_mastery_index ?? 0) * 100).toFixed(0)}%`
+              : "0%"}
           </div>
           <div className="text-[11px] text-ink-muted font-medium mt-1">
-            Deterministic BKT Aggregate
+            Deterministic Bayesian Knowledge Model
           </div>
         </div>
 
@@ -133,17 +135,20 @@ export function MasteryDiagnosisTab({
             </span>
           </div>
           <div className="text-[11px] text-ink-muted font-medium mt-1">
-            P(L) ≥ 0.85 Verified Threshold
+            Performance ≥ 0.85 Verified Threshold
           </div>
         </div>
 
         <div className="tactile-card p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs font-bold text-ink-muted">
-            <span>Confirmed Gaps</span>
+            <span>Identified Gaps</span>
             <AlertTriangle className="w-4 h-4 text-brand-coral" />
           </div>
           <div className="text-3xl font-black text-brand-coral mt-2">
-            {diagnosticSummary?.confirmed_gap_count || 0}
+            {diagnosticSummary?.demonstrated_weakness_count ??
+              diagnosticSummary?.confirmed_gap_count ??
+              diagnosticSummary?.identified_root_cause_gaps?.length ??
+              0}
           </div>
           <div className="text-[11px] text-ink-muted font-medium mt-1">
             Evidence-backed root cause gaps
@@ -165,26 +170,33 @@ export function MasteryDiagnosisTab({
         </div>
       </section>
 
-      {/* Prerequisite Failure Alerts (if any) */}
-      {diagnosticSummary && diagnosticSummary.prerequisite_failures.length > 0 && (
-        <div className="tactile-card-warm border-brand-coral bg-brand-coral/10 p-5 flex flex-col gap-2">
-          <div className="flex items-center gap-2 font-black text-sm text-brand-coral">
-            <AlertTriangle className="w-4 h-4" />
-            <span>PREREQUISITE DEPENDENCY VIOLATIONS DETECTED</span>
+      {/* Root Cause Gaps / Prerequisite Alerts (if any) */}
+      {diagnosticSummary &&
+        ((diagnosticSummary.prerequisite_failures && diagnosticSummary.prerequisite_failures.length > 0) ||
+          (diagnosticSummary.identified_root_cause_gaps && diagnosticSummary.identified_root_cause_gaps.length > 0)) && (
+          <div className="tactile-card-warm border-brand-coral bg-brand-coral/10 p-5 flex flex-col gap-2">
+            <div className="flex items-center gap-2 font-black text-sm text-brand-coral">
+              <AlertTriangle className="w-4 h-4" />
+              <span>CURRICULUM PREREQUISITE GAPS DETECTED</span>
+            </div>
+            <p className="text-xs text-ink font-medium">
+              Recall identified foundational gap objectives that require intervention:
+            </p>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {diagnosticSummary.prerequisite_failures?.map((pf, idx) => (
+                <span key={idx} className="tactile-tag bg-white text-ink text-xs">
+                  <span className="font-bold text-brand-coral">{pf.target_code}</span> requires{" "}
+                  <span className="font-bold text-brand-green">{pf.unmet_prerequisite_code}</span>
+                </span>
+              ))}
+              {diagnosticSummary.identified_root_cause_gaps?.map((gap, idx) => (
+                <span key={`gap-${idx}`} className="tactile-tag bg-brand-coral text-white text-xs font-bold">
+                  Gap: {gap}
+                </span>
+              ))}
+            </div>
           </div>
-          <p className="text-xs text-ink font-medium">
-            The student is attempting advanced concepts without mastering foundational prerequisites:
-          </p>
-          <div className="flex flex-wrap gap-2 mt-1">
-            {diagnosticSummary.prerequisite_failures.map((pf, idx) => (
-              <span key={idx} className="tactile-tag bg-white text-ink text-xs">
-                <span className="font-bold text-brand-coral">{pf.target_code}</span> requires{" "}
-                <span className="font-bold text-brand-green">{pf.unmet_prerequisite_code}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
 
       {/* Main Breakdown: Objective Mastery & Diagnostic Status */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -211,41 +223,49 @@ export function MasteryDiagnosisTab({
                   <tr>
                     <th className="p-3">Objective</th>
                     <th className="p-3">Status</th>
-                    <th className="p-3">P(Mastery)</th>
+                    <th className="p-3">Performance</th>
+                    <th className="p-3">Confidence</th>
                     <th className="p-3">Attempts</th>
-                    <th className="p-3">Streak</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y border-ink/10 font-medium">
-                  {masterySummary?.objectives.map((obj) => {
+                  {masterySummary?.objectives?.map((obj) => {
+                    const mState = obj.mastery_state || obj.status || "untested";
                     const statusTag =
-                      obj.status === "mastered"
+                      mState === "mastered"
                         ? "bg-brand-green text-ink"
-                        : obj.status === "in_progress"
+                        : mState === "developing"
                         ? "bg-brand-yellow text-ink"
+                        : mState === "needs_remediation"
+                        ? "bg-brand-coral text-white"
                         : "bg-surface-muted text-ink-muted";
+
+                    const perf = obj.performance_score ?? obj.mastery_probability ?? 0;
+                    const conf = obj.confidence_score ?? obj.confidence_bound_lower ?? 0;
+                    const attempts = obj.total_attempts ?? obj.attempts_count ?? 0;
 
                     return (
                       <tr key={obj.objective_id} className="hover:bg-surface-warm/20">
                         <td className="p-3">
                           <div className="font-black text-ink">{obj.objective_code}</div>
-                          <div className="text-[10px] text-ink-muted">
-                            [{obj.confidence_bound_lower.toFixed(2)} -{" "}
-                            {obj.confidence_bound_upper.toFixed(2)}]
-                          </div>
+                          {obj.blocked_by_prerequisites && obj.blocked_by_prerequisites.length > 0 && (
+                            <div className="text-[10px] text-brand-coral font-bold">
+                              Blocked: {obj.blocked_by_prerequisites.join(", ")}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3">
                           <span className={`tactile-tag text-[9px] py-0 px-1.5 ${statusTag} uppercase`}>
-                            {obj.status}
+                            {mState.replace(/_/g, " ")}
                           </span>
                         </td>
                         <td className="p-3 font-mono font-bold text-ink">
-                          {(obj.mastery_probability * 100).toFixed(1)}%
+                          {(perf * 100).toFixed(1)}%
                         </td>
-                        <td className="p-3 font-mono text-ink">{obj.attempts_count}</td>
-                        <td className="p-3 font-mono text-ink font-bold">
-                          {obj.consecutive_correct}
+                        <td className="p-3 font-mono text-ink">
+                          {(conf * 100).toFixed(0)}%
                         </td>
+                        <td className="p-3 font-mono text-ink">{attempts}</td>
                       </tr>
                     );
                   })}
@@ -278,9 +298,9 @@ export function MasteryDiagnosisTab({
                 onChange={(e) => setTargetObjectiveId(e.target.value)}
                 className="tactile-input text-xs font-bold"
               >
-                {masterySummary?.objectives.map((obj) => (
+                {masterySummary?.objectives?.map((obj) => (
                   <option key={obj.objective_id} value={obj.objective_id}>
-                    {obj.objective_code} ({obj.status})
+                    {obj.objective_code} ({obj.mastery_state || obj.status || "untested"})
                   </option>
                 ))}
               </select>
@@ -296,49 +316,57 @@ export function MasteryDiagnosisTab({
             </button>
 
             {/* Generated Plan Details */}
-            {plannedSession && (
-              <div className="mt-2 p-4 bg-surface-warm/40 border-2 border-ink rounded-friendly-sm flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="tactile-tag bg-brand-green text-ink text-[10px]">
-                    {plannedSession.total_questions} Questions Planned
-                  </span>
-                  <span className="text-[10px] font-bold text-ink-muted uppercase">
-                    Bounded &lt;= 5 Qs
-                  </span>
-                </div>
+            {plannedSession && (() => {
+              const questions = plannedSession.recommended_questions || plannedSession.planned_questions || [];
+              const rationaleText = plannedSession.session_rationale || plannedSession.rationale || "";
+              const count = questions.length;
 
-                <div className="text-xs text-ink font-medium">
-                  <strong>Rationale:</strong> {plannedSession.rationale}
-                </div>
+              return (
+                <div className="mt-2 p-4 bg-surface-warm/40 border-2 border-ink rounded-friendly-sm flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="tactile-tag bg-brand-green text-ink text-[10px]">
+                      {count} Questions Planned
+                    </span>
+                    <span className="text-[10px] font-bold text-ink-muted uppercase">
+                      Bounded &le; 5 Qs
+                    </span>
+                  </div>
 
-                <div className="flex flex-col gap-2 pt-2 border-t border-ink/10">
-                  {plannedSession.planned_questions.map((pq, idx) => (
-                    <div
-                      key={pq.question_id}
-                      className="p-2 bg-white border border-ink rounded text-xs flex items-center justify-between"
-                    >
-                      <div>
-                        <span className="font-bold text-ink mr-2">#{idx + 1}</span>
-                        <span className="font-medium text-ink">{pq.title}</span>
-                      </div>
-                      <span className="tactile-tag bg-surface-muted text-ink text-[9px] py-0 px-1 uppercase">
-                        {pq.difficulty}
-                      </span>
+                  {rationaleText && (
+                    <div className="text-xs text-ink font-medium">
+                      <strong>Rationale:</strong> {rationaleText}
                     </div>
-                  ))}
-                </div>
+                  )}
 
-                {onStartProbingPlan && (
-                  <button
-                    onClick={() => onStartProbingPlan(plannedSession)}
-                    className="tactile-btn-coral text-xs py-1.5 w-full mt-1"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                    <span>Begin Diagnostic Probes</span>
-                  </button>
-                )}
-              </div>
-            )}
+                  <div className="flex flex-col gap-2 pt-2 border-t border-ink/10">
+                    {questions.map((pq, idx) => (
+                      <div
+                        key={pq.question_id}
+                        className="p-2 bg-white border border-ink rounded text-xs flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-bold text-ink mr-2">#{idx + 1}</span>
+                          <span className="font-medium text-ink">{pq.title}</span>
+                        </div>
+                        <span className="tactile-tag bg-surface-muted text-ink text-[9px] py-0 px-1 uppercase">
+                          {pq.difficulty}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {onStartProbingPlan && (
+                    <button
+                      onClick={() => onStartProbingPlan(plannedSession)}
+                      className="tactile-btn-coral text-xs py-1.5 w-full mt-1"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Begin Diagnostic Probes</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

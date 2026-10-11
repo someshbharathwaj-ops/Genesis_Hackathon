@@ -264,11 +264,13 @@ export function KnowledgeTab({ course }: KnowledgeTabProps) {
             {retrievalResults && (
               <div className="mt-2 flex flex-col gap-2 pt-3 border-t border-ink/10">
                 <div className="text-xs font-bold text-ink flex items-center justify-between">
-                  <span>{retrievalResults.matches_count} Verified Matches Found:</span>
-                  <span className="text-[10px] text-ink-muted">Strict Threshold: 0.30</span>
+                  <span>
+                    {retrievalResults.matches?.length ?? 0} Matches ({retrievalResults.total_candidates ?? retrievalResults.matches_count ?? retrievalResults.matches?.length ?? 0} Candidates Evaluated):
+                  </span>
+                  <span className="text-[10px] text-ink-muted">Strict Threshold: 0.25</span>
                 </div>
 
-                {retrievalResults.matches.length === 0 ? (
+                {(!retrievalResults.matches || retrievalResults.matches.length === 0) ? (
                   <div className="p-4 bg-brand-coral/10 border-2 border-brand-coral rounded-friendly-sm text-xs font-bold text-brand-coral">
                     No relevant chunks met confidence threshold. System will explicitly ABSTAIN rather than hallucinate.
                   </div>
@@ -280,7 +282,7 @@ export function KnowledgeTab({ course }: KnowledgeTabProps) {
                     >
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="font-bold text-brand-cyan">
-                          [Lecture: {m.filename}, Page {m.page_number}]
+                          [Lecture: {m.document_filename || m.filename || "Course Material"}, Page {m.page_number}]
                         </span>
                         <span className="tactile-tag bg-brand-green text-ink text-[9px] py-0 px-1">
                           Score: {(m.similarity_score * 100).toFixed(0)}%
