@@ -29,9 +29,15 @@ export function CurriculumTab({
   const [expandedTopicId, setExpandedTopicId] = useState<string | null>(
     topics.length > 0 ? topics[0].id : null
   );
+  const [selectedTopicFilter, setSelectedTopicFilter] = useState<string>("ALL");
   const [selectedObjective, setSelectedObjective] = useState<LearningObjectiveResponse | null>(null);
   const [objectiveQuestions, setObjectiveQuestions] = useState<QuestionResponse[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+
+  const displayedTopics =
+    selectedTopicFilter === "ALL"
+      ? topics
+      : topics.filter((t) => t.id === selectedTopicFilter);
 
   const handleObjectiveClick = async (objective: LearningObjectiveResponse) => {
     setSelectedObjective(objective);
@@ -83,6 +89,48 @@ export function CurriculumTab({
         </div>
       </section>
 
+      {/* Topic / DAG Cluster Filter Bar */}
+      {topics.length > 1 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-bold text-ink-muted uppercase tracking-wider flex items-center justify-between">
+            <span>Select Curriculum DAG to Explore:</span>
+            <span className="font-mono text-[11px] font-black text-brand-cyan">
+              {selectedTopicFilter === "ALL"
+                ? `Showing All ${topics.length} DAG Clusters`
+                : topics.find((t) => t.id === selectedTopicFilter)?.title}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setSelectedTopicFilter("ALL")}
+              className={`tactile-btn-white text-xs py-1.5 px-3 font-bold ${
+                selectedTopicFilter === "ALL"
+                  ? "!bg-brand-yellow !shadow-hard-sm"
+                  : ""
+              }`}
+            >
+              <span>🌐 All DAG Clusters ({topics.length})</span>
+            </button>
+            {topics.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setSelectedTopicFilter(t.id);
+                  setExpandedTopicId(t.id);
+                }}
+                className={`tactile-btn-white text-xs py-1.5 px-3 font-bold ${
+                  selectedTopicFilter === t.id
+                    ? "!bg-brand-cyan !text-ink !shadow-hard-sm"
+                    : ""
+                }`}
+              >
+                <span>📚 DAG #{t.order_index}: {t.code}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Curriculum DAG & Objectives Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Topics & Objectives Hierarchy */}
@@ -92,12 +140,12 @@ export function CurriculumTab({
             <span>Topics & Prerequisites DAG</span>
           </h3>
 
-          {topics.length === 0 ? (
+          {displayedTopics.length === 0 ? (
             <div className="tactile-card p-6 text-center text-ink-muted text-sm">
               No topics found for {course?.code || "this course"}. Click &quot;Seed {course?.code || "Course"}&quot; in the header to initialize curriculum.
             </div>
           ) : (
-            topics.map((topic) => {
+            displayedTopics.map((topic) => {
               const isExpanded = expandedTopicId === topic.id;
               return (
                 <div key={topic.id} className="tactile-card overflow-hidden">
@@ -118,6 +166,20 @@ export function CurriculumTab({
                       <span className="tactile-tag bg-surface text-ink text-[10px]">
                         {topic.objectives.length} Objectives
                       </span>
+                      {topic.objectives.length > 0 && onSelectObjectiveForPractice && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectObjectiveForPractice(topic.objectives[0]);
+                          }}
+                          className="tactile-btn-yellow text-[10px] py-1 px-2 font-bold flex items-center gap-1 shadow-hard-sm"
+                          title="Practice questions attached to this topic DAG"
+                        >
+                          <Sparkles className="w-3 h-3 text-ink" />
+                          <span>Practice DAG</span>
+                        </button>
+                      )}
                       {isExpanded ? (
                         <ChevronDown className="w-4 h-4 text-ink" />
                       ) : (

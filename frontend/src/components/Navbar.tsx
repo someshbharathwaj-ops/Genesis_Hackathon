@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import {
   BookOpen,
   CheckCircle2,
+  GraduationCap,
   Lock,
   LogOut,
   Plus,
@@ -11,6 +12,7 @@ import {
   Shield,
   Sparkles,
   User,
+  UserCheck,
   Users,
   X,
 } from "lucide-react";
@@ -21,7 +23,7 @@ interface NavbarProps {
   courses: CourseResponse[];
   selectedCourse: CourseResponse | null;
   onSelectCourse: (course: CourseResponse) => void;
-  onLoginDemo: (role: "student" | "instructor") => void;
+  onLoginDemo: (role: "student" | "instructor" | "admin") => void;
   onLogout: () => void;
   onSeedCourse: (courseCode?: string) => void;
   onSeedNewCourse?: (payload: { code: string; title: string; description?: string }) => void;
@@ -125,6 +127,52 @@ export function Navbar({
             <span>+ New Course</span>
           </button>
 
+          {/* 1-Click Direct Role Switcher (Zero sign-out needed) */}
+          <div className="flex items-center bg-surface border-2 border-ink p-0.5 rounded-friendly-sm shadow-hard-sm">
+            <button
+              id="nav-role-student"
+              type="button"
+              onClick={() => onLoginDemo("student")}
+              className={`px-2 py-1 text-xs font-bold rounded flex items-center gap-1 transition-all ${
+                currentUser?.role === "student"
+                  ? "bg-brand-yellow text-ink shadow-hard-sm"
+                  : "text-ink-muted hover:text-ink hover:bg-surface-warm"
+              }`}
+              title="Switch directly to Student Mode"
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>Student</span>
+            </button>
+            <button
+              id="nav-role-instructor"
+              type="button"
+              onClick={() => onLoginDemo("instructor")}
+              className={`px-2 py-1 text-xs font-bold rounded flex items-center gap-1 transition-all ${
+                currentUser?.role === "instructor"
+                  ? "bg-brand-coral text-white shadow-hard-sm"
+                  : "text-ink-muted hover:text-ink hover:bg-surface-warm"
+              }`}
+              title="Switch directly to Instructor Mode"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Instructor</span>
+            </button>
+            <button
+              id="nav-role-admin"
+              type="button"
+              onClick={() => onLoginDemo("admin")}
+              className={`px-2 py-1 text-xs font-bold rounded flex items-center gap-1 transition-all ${
+                currentUser?.role === "admin"
+                  ? "bg-brand-green text-ink shadow-hard-sm"
+                  : "text-ink-muted hover:text-ink hover:bg-surface-warm"
+              }`}
+              title="Switch directly to Admin & Audit Mode"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Admin</span>
+            </button>
+          </div>
+
           {/* User Auth Info & Switcher */}
           {currentUser ? (
             <div className="relative">
@@ -177,8 +225,18 @@ export function Navbar({
                     }}
                     className="tactile-btn-white text-xs py-1 text-left justify-start"
                   >
-                    <Shield className="w-3.5 h-3.5 text-brand-coral" />
-                    <span>Demo Instructor (Prof. Codd)</span>
+                    <UserCheck className="w-3.5 h-3.5 text-brand-coral" />
+                    <span>Demo Instructor (Prof. Faculty)</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onLoginDemo("admin");
+                      setShowUserMenu(false);
+                    }}
+                    className="tactile-btn-white text-xs py-1 text-left justify-start"
+                  >
+                    <Shield className="w-3.5 h-3.5 text-brand-green" />
+                    <span>Demo Admin (Auditor Console)</span>
                   </button>
 
                   <div className="pt-2 border-t-2 border-ink/10">

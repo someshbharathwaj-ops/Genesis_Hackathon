@@ -345,6 +345,10 @@ async def seed_os_curriculum_and_questions(
                         mime_type="text/markdown",
                     )
     except Exception:
+    try:
+        from app.seeds.seed_all_comprehensive_curriculum import seed_comprehensive_curriculum
+        await seed_comprehensive_curriculum(session)
+    except Exception:
         pass
 
     return {

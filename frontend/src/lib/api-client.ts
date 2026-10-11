@@ -114,7 +114,7 @@ export const recallApi = {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
-  demoLogin: (role: "student" | "instructor" = "student", courseCode: string = "CS340") =>
+  demoLogin: (role: "student" | "instructor" | "admin" = "student", courseCode: string = "CS340") =>
     fetchApi<TokenResponse>("/auth/demo-login", {
       method: "POST",
       body: JSON.stringify({ role, course_code: courseCode }),

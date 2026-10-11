@@ -478,6 +478,13 @@ async def seed_dbms_curriculum_and_questions(
             # Non-fatal if filesystem folder is unavailable
             pass
 
+    try:
+        from app.seeds.seed_all_comprehensive_curriculum import seed_comprehensive_curriculum
+
+        await seed_comprehensive_curriculum(session)
+    except Exception:
+        pass
+
     return {
         "status": "success",
         "course_id": course.id,
