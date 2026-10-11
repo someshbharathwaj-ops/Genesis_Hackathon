@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowRight,
   BookOpen,
   Calendar,
   CheckCircle2,
@@ -32,6 +33,15 @@ import {
   UserResponse,
 } from "../types";
 import { ApiError, recallApi } from "../lib/api-client";
+
+export interface AdaptiveNextRecommendation {
+  type: "mastery_advance" | "prerequisite_reinforce" | "alternative_practice" | "track_completed";
+  badge: string;
+  badgeColor: string;
+  reason: string;
+  targetObjective: LearningObjectiveResponse;
+  question: QuestionResponse;
+}
 
 interface RevisorTabProps {
   course: CourseResponse | null;
@@ -65,6 +75,28 @@ export function RevisorTab({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submissionResult, setSubmissionResult] = useState<AttemptResponse | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // --- ADAPTIVE COMPLETION & PROGRESSION STATE ---
+  const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
+  const [nextAdaptiveRecommendation, setNextAdaptiveRecommendation] =
+    useState<AdaptiveNextRecommendation | null>(null);
+  const [preparingAdaptiveNext, setPreparingAdaptiveNext] = useState<boolean>(false);
+
+  const storageKey = `recall_completed_questions_${currentUser?.id || "anon"}_${course?.id || "default"}`;
+
+  // Load completed questions from localStorage on mount / course switch
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        setCompletedQuestionIds(JSON.parse(stored));
+      } else {
+        setCompletedQuestionIds([]);
+      }
+    } catch {
+      setCompletedQuestionIds([]);
+    }
+  }, [storageKey]);
 
   // --- EXPLANATION AUDIT STATE ---
   const [candidateText, setCandidateText] = useState<string>(
@@ -162,10 +194,15 @@ export function RevisorTab({
       try {
         const qs = await recallApi.listQuestionsForObjective(selectedObjectiveId);
         setQuestions(qs);
-        if (qs.length > 0) {
-          setSelectedQuestion(qs[0]);
+        // Prioritize uncompleted questions so previously answered questions do not repeat
+        const uncompleted = qs.filter((q) => !completedQuestionIds.includes(q.id));
+        if (uncompleted.length > 0) {
+          setSelectedQuestion(uncompleted[0]);
           setSubmissionResult(null);
           setAnswerInput("");
+          setNextAdaptiveRecommendation(null);
+        } else if (qs.length > 0) {
+          setSelectedQuestion(qs[0]);
         } else {
           setSelectedQuestion(null);
         }
@@ -177,11 +214,129 @@ export function RevisorTab({
       }
     }
     loadQuestions();
-  }, [selectedObjectiveId]);
+  }, [selectedObjectiveId, completedQuestionIds.length]);
+
+  // Adaptive next question preparation based on student's submitted answer
+  const prepareAdaptiveNext = async (
+    resp: AttemptResponse,
+    currentQuestion: QuestionResponse,
+    updatedCompleted: string[]
+  ) => {
+    setPreparingAdaptiveNext(true);
+    try {
+      const isCorrect = resp.is_correct || resp.score_achieved >= (resp.max_possible_score || 1.0) * 0.7;
+      const currentObj = allObjectives.find((o) => o.id === currentQuestion.objective_id);
+
+      if (isCorrect) {
+        // CASE 1: Student is Correct -> Advance along DAG or to next objective challenge
+        // A. Check if there are other uncompleted questions in the same objective
+        const sameObjRemaining = questions.filter(
+          (q) => q.id !== currentQuestion.id && !updatedCompleted.includes(q.id)
+        );
+        if (sameObjRemaining.length > 0) {
+          setNextAdaptiveRecommendation({
+            type: "mastery_advance",
+            badge: "MASTERY DEMONSTRATED (+1.0)",
+            badgeColor: "bg-brand-green text-white",
+            reason: `Excellent answer! Concept mastery verified. Progressing to next challenge in '${currentObj?.title || "this objective"}'.`,
+            targetObjective: currentObj || allObjectives[0],
+            question: sameObjRemaining[0],
+          });
+          return;
+        }
+
+        // B. If current objective is complete, advance to the NEXT Learning Objective in the DAG!
+        const currentIdx = allObjectives.findIndex((o) => o.id === currentObj?.id);
+        const subsequentObjectives = allObjectives.slice(currentIdx + 1);
+
+        for (const nextObj of subsequentObjectives) {
+          const nextQs = await recallApi.listQuestionsForObjective(nextObj.id);
+          const uncompleted = nextQs.filter((q) => !updatedCompleted.includes(q.id));
+          if (uncompleted.length > 0) {
+            setNextAdaptiveRecommendation({
+              type: "mastery_advance",
+              badge: "DAG ADVANCEMENT",
+              badgeColor: "bg-brand-cyan text-ink",
+              reason: `All questions in '${currentObj?.title}' mastered! Advancing along the curriculum DAG to next objective: '${nextObj.title}' (${nextObj.code}).`,
+              targetObjective: nextObj,
+              question: uncompleted[0],
+            });
+            return;
+          }
+        }
+      } else {
+        // CASE 2: Student is Incorrect -> Diagnosed Gap / Reinforce Prerequisite
+        // A. Check if the current objective has prerequisites in the DAG
+        const prereqRefs = currentObj?.prerequisite_objective_ids || [];
+        for (const pRef of prereqRefs) {
+          const prereqObj = allObjectives.find(
+            (o) => o.id === pRef || o.code.toUpperCase() === pRef.toUpperCase()
+          );
+          if (prereqObj) {
+            const prereqQs = await recallApi.listQuestionsForObjective(prereqObj.id);
+            const uncompletedPrereq = prereqQs.filter((q) => !updatedCompleted.includes(q.id));
+            if (uncompletedPrereq.length > 0) {
+              setNextAdaptiveRecommendation({
+                type: "prerequisite_reinforce",
+                badge: "PREREQUISITE REINFORCEMENT",
+                badgeColor: "bg-brand-coral text-white",
+                reason: `Misconception detected. Adaptive engine recommends reinforcing foundational prerequisite: '${prereqObj.title}' (${prereqObj.code}).`,
+                targetObjective: prereqObj,
+                question: uncompletedPrereq[0],
+              });
+              return;
+            }
+          }
+        }
+
+        // B. If no uncompleted prerequisite question, provide alternative uncompleted item in same objective
+        const sameObjRemaining = questions.filter(
+          (q) => q.id !== currentQuestion.id && !updatedCompleted.includes(q.id)
+        );
+        if (sameObjRemaining.length > 0) {
+          setNextAdaptiveRecommendation({
+            type: "prerequisite_reinforce",
+            badge: "CONCEPT REINFORCEMENT",
+            badgeColor: "bg-brand-yellow text-ink",
+            reason: `Incorrect answer. Presenting alternative practice question to reinforce understanding of '${currentObj?.title}'.`,
+            targetObjective: currentObj || allObjectives[0],
+            question: sameObjRemaining[0],
+          });
+          return;
+        }
+      }
+
+      // Fallback: Find ANY uncompleted question across the course curriculum
+      for (const anyObj of allObjectives) {
+        const anyQs = await recallApi.listQuestionsForObjective(anyObj.id);
+        const uncompleted = anyQs.filter((q) => !updatedCompleted.includes(q.id));
+        if (uncompleted.length > 0) {
+          setNextAdaptiveRecommendation({
+            type: "alternative_practice",
+            badge: "ADAPTIVE ROTATION",
+            badgeColor: "bg-surface text-ink",
+            reason: `Continuing curriculum sequence with next available question in '${anyObj.title}'.`,
+            targetObjective: anyObj,
+            question: uncompleted[0],
+          });
+          return;
+        }
+      }
+
+      // If all questions in the entire course are completed
+      setNextAdaptiveRecommendation(null);
+    } catch {
+      setNextAdaptiveRecommendation(null);
+    } finally {
+      setPreparingAdaptiveNext(false);
+    }
+  };
 
   // Submit Answer to Grader
   const handleSubmitAttempt = async () => {
     if (!currentUser || !selectedQuestion || !selectedQuestion.versions[0]) return;
+    if (completedQuestionIds.includes(selectedQuestion.id)) return; // Prevent double submit
+
     setIsSubmitting(true);
     setSubmitError(null);
     setSubmissionResult(null);
@@ -200,10 +355,48 @@ export function RevisorTab({
     try {
       const resp = await recallApi.submitAttempt(payload, idempotencyKey);
       setSubmissionResult(resp);
+
+      // Lock question from re-submitting and prevent it from appearing again
+      const nextCompleted = Array.from(new Set([...completedQuestionIds, selectedQuestion.id]));
+      setCompletedQuestionIds(nextCompleted);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(nextCompleted));
+      } catch {}
+
+      // Prepare next question adaptively based on the answer
+      await prepareAdaptiveNext(resp, selectedQuestion, nextCompleted);
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : "Failed to grade attempt.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Apply Adaptive Recommendation: switch to the prepared question
+  const handleApplyAdaptiveRecommendation = (rec: AdaptiveNextRecommendation) => {
+    if (rec.targetObjective.id !== selectedObjectiveId) {
+      setSelectedObjectiveId(rec.targetObjective.id);
+    }
+    setSelectedQuestion(rec.question);
+    setAnswerInput("");
+    setSubmissionResult(null);
+    setSubmitError(null);
+    setNextAdaptiveRecommendation(null);
+  };
+
+  // Reset Progress Handler: allow re-attempting questions if student desires
+  const handleResetProgress = () => {
+    if (window.confirm("Reset solved question records for this course to practice again from the beginning?")) {
+      setCompletedQuestionIds([]);
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {}
+      setSubmissionResult(null);
+      setAnswerInput("");
+      setNextAdaptiveRecommendation(null);
+      if (questions.length > 0) {
+        setSelectedQuestion(questions[0]);
+      }
     }
   };
 
@@ -271,6 +464,12 @@ export function RevisorTab({
 
   const currentVersion = selectedQuestion?.versions[0];
   const activeObj = allObjectives.find((o) => o.id === selectedObjectiveId);
+  const isCurrentQuestionCompleted =
+    !!selectedQuestion && completedQuestionIds.includes(selectedQuestion.id);
+  const uncompletedQuestions = questions.filter(
+    (q) => !completedQuestionIds.includes(q.id)
+  );
+  const completedInThisObjectiveCount = questions.length - uncompletedQuestions.length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -431,9 +630,21 @@ export function RevisorTab({
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-ink">Available Questions:</label>
-                  <span className="tactile-tag bg-surface text-ink text-[10px]">
-                    {questions.length} Verified in Bank
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {completedQuestionIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetProgress}
+                        className="text-[10px] text-ink-muted hover:text-brand-coral font-bold underline cursor-pointer"
+                        title="Clear completed history for this course"
+                      >
+                        Reset History
+                      </button>
+                    )}
+                    <span className="tactile-tag bg-surface text-ink text-[10px]">
+                      {uncompletedQuestions.length} Pending &bull; {completedInThisObjectiveCount} Solved
+                    </span>
+                  </div>
                 </div>
                 <select
                   value={selectedQuestion?.id || ""}
@@ -443,16 +654,21 @@ export function RevisorTab({
                       setSelectedQuestion(q);
                       setSubmissionResult(null);
                       setAnswerInput("");
+                      setNextAdaptiveRecommendation(null);
                     }
                   }}
                   className="tactile-select text-xs font-medium"
                 >
                   {questions.length === 0 ? (
                     <option value="">No questions found for this objective</option>
+                  ) : uncompletedQuestions.length === 0 ? (
+                    <option value={selectedQuestion?.id || ""}>
+                      All {questions.length} questions in this objective completed! ✓
+                    </option>
                   ) : (
-                    questions.map((q) => (
+                    uncompletedQuestions.map((q) => (
                       <option key={q.id} value={q.id}>
-                        {q.title} ({q.question_type})
+                        {q.title} ({q.question_type}) &bull; {q.versions[0]?.difficulty || "standard"}
                       </option>
                     ))
                   )}
@@ -463,6 +679,19 @@ export function RevisorTab({
             {/* Question Display Card */}
             {selectedQuestion && currentVersion ? (
               <div className="tactile-card p-6 flex flex-col gap-5">
+                {/* Completion Status Alert */}
+                {isCurrentQuestionCompleted && (
+                  <div className="p-3 bg-brand-green/15 border-2 border-brand-green rounded-friendly-sm flex items-center justify-between text-xs font-bold text-ink animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
+                      <span>Answer Submitted &amp; Evaluated &mdash; Submit option is locked for this question.</span>
+                    </div>
+                    <span className="tactile-tag bg-brand-green text-white text-[10px] uppercase font-black">
+                      COMPLETED
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink/10 pb-3">
                   <div>
                     <h3 className="text-lg font-black text-ink">{selectedQuestion.title}</h3>
@@ -501,7 +730,9 @@ export function RevisorTab({
                           <button
                             key={optId}
                             type="button"
+                            disabled={isCurrentQuestionCompleted || isSubmitting}
                             onClick={() => {
+                              if (isCurrentQuestionCompleted) return;
                               if (selectedQuestion.question_type === "multiple_select") {
                                 const currentParts = answerInput
                                   .split(",")
@@ -520,7 +751,7 @@ export function RevisorTab({
                               isChosen
                                 ? "bg-brand-yellow font-black shadow-hard-sm border-ink"
                                 : "bg-surface hover:bg-surface-warm font-medium"
-                            }`}
+                            } ${isCurrentQuestionCompleted ? "cursor-not-allowed opacity-80" : ""}`}
                           >
                             <span className="font-mono font-black mr-2 bg-ink/10 px-1.5 py-0.5 rounded">
                               {optId}
@@ -558,9 +789,15 @@ export function RevisorTab({
                     type="text"
                     value={answerInput}
                     onChange={(e) => setAnswerInput(e.target.value)}
-                    placeholder="Enter answer (or click options above)"
-                    className="tactile-input text-xs font-mono"
-                    disabled={isSubmitting}
+                    placeholder={
+                      isCurrentQuestionCompleted
+                        ? "Answer submitted & evaluated. Question locked."
+                        : "Enter answer (or click options above)"
+                    }
+                    className={`tactile-input text-xs font-mono ${
+                      isCurrentQuestionCompleted ? "bg-surface opacity-80 cursor-not-allowed" : ""
+                    }`}
+                    disabled={isCurrentQuestionCompleted || isSubmitting}
                   />
 
                   {submitError && (
@@ -571,17 +808,63 @@ export function RevisorTab({
 
                   <div className="flex items-center justify-between pt-2">
                     <span className="text-[11px] text-ink-muted font-medium">
-                      Evaluated using Armstrong axioms closure computation.
+                      {isCurrentQuestionCompleted
+                        ? "Evaluated deterministically. Submit option is locked."
+                        : "Evaluated using Armstrong axioms closure computation."}
                     </span>
-                    <button
-                      onClick={handleSubmitAttempt}
-                      disabled={isSubmitting || !answerInput.trim()}
-                      className="tactile-btn-coral text-xs py-2.5 px-5 font-black"
-                    >
-                      <Send className={`w-3.5 h-3.5 ${isSubmitting ? "animate-spin" : ""}`} />
-                      <span>{isSubmitting ? "Evaluating..." : "Submit Answer"}</span>
-                    </button>
+                    {isCurrentQuestionCompleted ? (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-brand-green/20 border-2 border-brand-green rounded-friendly-sm text-xs font-black text-brand-green">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Submitted &amp; Evaluated</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleSubmitAttempt}
+                        disabled={isSubmitting || !answerInput.trim()}
+                        className="tactile-btn-coral text-xs py-2.5 px-5 font-black"
+                      >
+                        <Send className={`w-3.5 h-3.5 ${isSubmitting ? "animate-spin" : ""}`} />
+                        <span>{isSubmitting ? "Evaluating..." : "Submit Answer"}</span>
+                      </button>
+                    )}
                   </div>
+
+                  {/* ADAPTIVE NEXT QUESTION CARD */}
+                  {nextAdaptiveRecommendation && (
+                    <div className="p-4 bg-brand-yellow/20 border-2 border-ink rounded-friendly-sm flex flex-col gap-3 shadow-hard-sm mt-3 animate-fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className={`tactile-tag text-xs font-black ${nextAdaptiveRecommendation.badgeColor}`}>
+                          {nextAdaptiveRecommendation.badge}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-ink-muted uppercase">
+                          Adaptive Next Step
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="text-xs font-black text-ink leading-relaxed">
+                          {nextAdaptiveRecommendation.reason}
+                        </div>
+                        <div className="text-xs text-ink-muted">
+                          Next Question: <span className="font-bold text-ink">{nextAdaptiveRecommendation.question.title}</span> &bull; {nextAdaptiveRecommendation.question.question_type}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyAdaptiveRecommendation(nextAdaptiveRecommendation)}
+                        className="tactile-btn-yellow text-xs py-2.5 px-4 font-black flex items-center justify-center gap-2 w-full shadow-hard-sm hover:scale-[1.01] transition-transform"
+                      >
+                        <span>Proceed to Next Adaptive Question</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {preparingAdaptiveNext && (
+                    <div className="p-3 bg-surface border border-ink/20 rounded text-xs font-bold text-ink-muted flex items-center gap-2">
+                      <div className="w-3.5 h-3.5 border-2 border-brand-yellow border-t-transparent rounded-full animate-spin" />
+                      <span>Analyzing answer &amp; preparing next adaptive question...</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -669,6 +952,29 @@ export function RevisorTab({
                     )}
                   </span>
                 </div>
+
+                {/* Adaptive Next Question Action in Grading Result */}
+                {nextAdaptiveRecommendation && (
+                  <div className="p-3.5 bg-brand-yellow/15 border-2 border-ink rounded-friendly-sm flex flex-col gap-2 mt-1">
+                    <div className="flex items-center justify-between">
+                      <span className={`tactile-tag text-[10px] font-black ${nextAdaptiveRecommendation.badgeColor}`}>
+                        {nextAdaptiveRecommendation.badge}
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-ink-muted uppercase">Adaptive Sequence</span>
+                    </div>
+                    <div className="text-xs font-black text-ink leading-tight">
+                      {nextAdaptiveRecommendation.reason}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyAdaptiveRecommendation(nextAdaptiveRecommendation)}
+                      className="tactile-btn-yellow text-xs py-2 px-3 font-black flex items-center justify-center gap-1.5 w-full mt-1"
+                    >
+                      <span>Proceed to Next Question</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="tactile-card p-8 text-center text-ink-muted flex flex-col items-center gap-2">
