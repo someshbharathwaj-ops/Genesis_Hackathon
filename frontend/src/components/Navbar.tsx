@@ -6,11 +6,13 @@ import {
   CheckCircle2,
   Lock,
   LogOut,
+  Plus,
   RefreshCw,
   Shield,
   Sparkles,
   User,
   Users,
+  X,
 } from "lucide-react";
 import { CourseResponse, UserResponse } from "../types";
 
@@ -21,7 +23,8 @@ interface NavbarProps {
   onSelectCourse: (course: CourseResponse) => void;
   onLoginDemo: (role: "student" | "instructor") => void;
   onLogout: () => void;
-  onSeedCourse: () => void;
+  onSeedCourse: (courseCode?: string) => void;
+  onSeedNewCourse?: (payload: { code: string; title: string; description?: string }) => void;
   isSeeding: boolean;
   hasActiveScoredAssessment: boolean;
 }
@@ -34,10 +37,15 @@ export function Navbar({
   onLoginDemo,
   onLogout,
   onSeedCourse,
+  onSeedNewCourse,
   isSeeding,
   hasActiveScoredAssessment,
 }: NavbarProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNewCourseModal, setShowNewCourseModal] = useState(false);
+  const [newCode, setNewCode] = useState("");
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
 
   return (
     <header className="tactile-card-warm p-4 md:p-5 flex flex-col gap-4">
@@ -93,15 +101,28 @@ export function Navbar({
             </select>
           </div>
 
-          {/* Seed DBMS Button */}
+          {/* Dynamic Seed Active Course Button */}
           <button
-            onClick={onSeedCourse}
+            id="btn-seed-active-course"
+            onClick={() => onSeedCourse(selectedCourse?.code)}
             disabled={isSeeding}
-            className="tactile-btn-white text-xs py-1.5 px-3"
-            title="Seed CS340 DBMS Curriculum & Questions"
+            className="tactile-btn-white text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
+            title={`Seed ${selectedCourse?.code || "Current"} Curriculum & Knowledge Base`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? "animate-spin" : ""}`} />
-            <span>{isSeeding ? "Seeding..." : "Seed DBMS"}</span>
+            <span>{isSeeding ? "Seeding..." : `Seed ${selectedCourse ? selectedCourse.code : "Course"}`}</span>
+          </button>
+
+          {/* Seed / Create New Course Trigger */}
+          <button
+            id="btn-seed-new-course"
+            onClick={() => setShowNewCourseModal(true)}
+            disabled={isSeeding}
+            className="tactile-btn-yellow text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
+            title="Seed a new or custom course"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>+ New Course</span>
           </button>
 
           {/* User Auth Info & Switcher */}
@@ -188,6 +209,167 @@ export function Navbar({
           )}
         </div>
       </div>
+
+      {/* Seed New Course Modal */}
+      {showNewCourseModal && (
+        <div className="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="tactile-card-warm max-w-md w-full p-6 flex flex-col gap-5 border-2 border-ink shadow-hard-lg">
+            <div className="flex items-center justify-between pb-3 border-b-2 border-ink/10">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-brand-yellow" />
+                <h3 className="font-black text-lg text-ink">Seed & Initialize Course</h3>
+              </div>
+              <button
+                onClick={() => setShowNewCourseModal(false)}
+                className="p-1 hover:bg-ink/10 rounded transition-colors"
+              >
+                <X className="w-4 h-4 text-ink-muted" />
+              </button>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-ink-muted uppercase tracking-wider">
+                Quick Catalog Presets
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewCode("CS301");
+                    setNewTitle("Operating Systems & Concurrency");
+                    setNewDescription(
+                      "Process management, CPU scheduling, synchronization, and deadlocks."
+                    );
+                  }}
+                  className="tactile-btn-white text-xs py-1 px-2 text-left justify-start"
+                >
+                  ⚡ CS301 (OS)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewCode("CS340");
+                    setNewTitle("Database Management Systems");
+                    setNewDescription(
+                      "Relational data model, functional dependencies, and normal forms."
+                    );
+                  }}
+                  className="tactile-btn-white text-xs py-1 px-2 text-left justify-start"
+                >
+                  ⚡ CS340 (DBMS)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewCode("CS305");
+                    setNewTitle("Computer Networks");
+                    setNewDescription(
+                      "OSI and TCP/IP models, routing protocols, flow control, and sockets."
+                    );
+                  }}
+                  className="tactile-btn-white text-xs py-1 px-2 text-left justify-start"
+                >
+                  ⚡ CS305 (Networks)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewCode("CS410");
+                    setNewTitle("Artificial Intelligence & ML");
+                    setNewDescription(
+                      "Search algorithms, heuristic evaluation, and reinforcement learning."
+                    );
+                  }}
+                  className="tactile-btn-white text-xs py-1 px-2 text-left justify-start"
+                >
+                  ⚡ CS410 (AI/ML)
+                </button>
+              </div>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newCode.trim() || !newTitle.trim()) return;
+                if (onSeedNewCourse) {
+                  await onSeedNewCourse({
+                    code: newCode.trim().toUpperCase(),
+                    title: newTitle.trim(),
+                    description: newDescription.trim() || undefined,
+                  });
+                } else {
+                  onSeedCourse(newCode.trim().toUpperCase());
+                }
+                setShowNewCourseModal(false);
+                setNewCode("");
+                setNewTitle("");
+                setNewDescription("");
+              }}
+              className="flex flex-col gap-3.5"
+            >
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-ink">
+                  Course Code <span className="text-brand-coral">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newCode}
+                  onChange={(e) => setNewCode(e.target.value)}
+                  placeholder="e.g. CS301 or CS305"
+                  className="tactile-input text-xs py-1.5 px-3 font-mono font-bold"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-ink">
+                  Course Title <span className="text-brand-coral">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="e.g. Operating Systems & Concurrency"
+                  className="tactile-input text-xs py-1.5 px-3"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-ink">
+                  Course Description (Optional)
+                </label>
+                <textarea
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="Key topics, prerequisites, and learning objectives..."
+                  rows={2}
+                  className="tactile-input text-xs py-1.5 px-3 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t-2 border-ink/10">
+                <button
+                  type="button"
+                  onClick={() => setShowNewCourseModal(false)}
+                  className="tactile-btn-white text-xs py-1.5 px-3"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSeeding || !newCode.trim() || !newTitle.trim()}
+                  className="tactile-btn-yellow text-xs py-1.5 px-4 flex items-center gap-1.5 font-bold"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? "animate-spin" : ""}`} />
+                  <span>{isSeeding ? "Seeding..." : "Seed & Initialize"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

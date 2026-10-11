@@ -11,11 +11,13 @@ Seeds:
 - Verified, versioned questions with rubrics, deterministic answer keys, and provenance hashes.
 """
 
+from pathlib import Path
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.curriculum import LearningObjective, Topic
+from app.models.document import CourseDocument
 from app.models.identity import Course, CourseEnrollment, User, UserRole
 from app.models.question import (
     DifficultyLevel,
@@ -319,7 +321,37 @@ async def seed_os_curriculum_and_questions(
         await v_repo.create(v)
 
         q.current_version_id = v.id
-        await session.commit()
         created_questions.append(q)
 
-    return course, created_questions
+    # 7. Auto-ingest authoritative documents if present
+    try:
+        from app.services.knowledge_service import KnowledgeService
+
+        knowledge_dir = Path(__file__).resolve().parents[3] / "knowledge" / "CS301"
+        if knowledge_dir.exists():
+            ks = KnowledgeService(session)
+            for md_file in knowledge_dir.glob("*.md"):
+                stmt = select(CourseDocument).where(
+                    CourseDocument.course_id == course.id,
+                    CourseDocument.filename == md_file.name,
+                )
+                res = await session.execute(stmt)
+                if not res.scalar_one_or_none():
+                    file_bytes = md_file.read_bytes()
+                    await ks.ingest_document(
+                        course_id=course.id,
+                        filename=md_file.name,
+                        file_bytes=file_bytes,
+                        mime_type="text/markdown",
+                    )
+    except Exception:
+        pass
+
+    return {
+        "status": "success",
+        "course_id": course.id,
+        "topic_id": topic.id,
+        "objectives_count": len(lo_map),
+        "new_questions_seeded": len(created_questions),
+        "total_catalog_questions": len(SEED_OS_QUESTIONS_DATA),
+    }

@@ -148,19 +148,54 @@ export default function HomePage() {
     setMentorMode("tutor");
   };
 
-  // Seed DBMS Handler
-  const handleSeedCourse = async () => {
+  // Seed Dynamic Course Handler
+  const handleSeedCourse = async (codeToSeed?: string) => {
+    const targetCode = (codeToSeed || selectedCourse?.code || "CS340").trim();
     setIsSeeding(true);
     try {
-      await recallApi.seedDbmsCourse();
+      if (targetCode.toUpperCase() === "CS301" || targetCode.toUpperCase() === "OS") {
+        await recallApi.seedOsCourse();
+      } else if (targetCode.toUpperCase() === "CS340" || targetCode.toUpperCase() === "DBMS") {
+        await recallApi.seedDbmsCourse();
+      } else {
+        await recallApi.seedCourse(targetCode);
+      }
       const courseList = await recallApi.listCourses();
       setCourses(courseList);
-      if (courseList.length > 0) {
-        handleSelectCourse(courseList[0]);
+      const updated =
+        courseList.find((c) => c.code.toUpperCase() === targetCode.toUpperCase()) ||
+        courseList[0];
+      if (updated) {
+        handleSelectCourse(updated);
       }
-      alert("Successfully seeded CS340 DBMS curriculum, verified questions, and authoritative knowledge base!");
+      alert(`Successfully seeded ${targetCode} curriculum, verified questions, and knowledge base!`);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to seed course.");
+      alert(err instanceof Error ? err.message : `Failed to seed course ${targetCode}.`);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  // Seed / Create Brand New Course Handler
+  const handleSeedNewCourse = async (payload: {
+    code: string;
+    title: string;
+    description?: string;
+  }) => {
+    setIsSeeding(true);
+    try {
+      await recallApi.seedNewCourse(payload);
+      const courseList = await recallApi.listCourses();
+      setCourses(courseList);
+      const matched =
+        courseList.find((c) => c.code.toUpperCase() === payload.code.toUpperCase()) ||
+        courseList[courseList.length - 1];
+      if (matched) {
+        handleSelectCourse(matched);
+      }
+      alert(`Successfully initialized and seeded ${payload.code}: ${payload.title}!`);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : `Failed to seed new course ${payload.code}.`);
     } finally {
       setIsSeeding(false);
     }
@@ -220,6 +255,7 @@ export default function HomePage() {
           onLoginDemo={handleDemoLogin}
           onLogout={handleLogout}
           onSeedCourse={handleSeedCourse}
+          onSeedNewCourse={handleSeedNewCourse}
           isSeeding={isSeeding}
           hasActiveScoredAssessment={!!activeScoredAssessmentId}
         />

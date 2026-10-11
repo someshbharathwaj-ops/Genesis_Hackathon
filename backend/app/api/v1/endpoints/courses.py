@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user, require_instructor_or_admin
@@ -193,6 +194,12 @@ async def enroll_student(
     return EnrollmentResponse.model_validate(created)
 
 
+class CourseSeedRequest(BaseModel):
+    code: str
+    title: str | None = None
+    description: str | None = None
+
+
 @router.post("/seed/dbms", status_code=status.HTTP_201_CREATED)
 async def seed_dbms_course(
     current_user: User = Depends(get_current_user),
@@ -202,4 +209,47 @@ async def seed_dbms_course(
     from app.seeds.seed_dbms_questions import seed_dbms_curriculum_and_questions
 
     result = await seed_dbms_curriculum_and_questions(db)
+    return result
+
+
+@router.post("/seed/os", status_code=status.HTTP_201_CREATED)
+async def seed_os_course(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    require_instructor_or_admin(current_user)
+    from app.seeds.seed_os_questions import seed_os_curriculum_and_questions
+
+    result = await seed_os_curriculum_and_questions(db)
+    return result
+
+
+@router.post("/seed", status_code=status.HTTP_201_CREATED)
+async def seed_new_course(
+    payload: CourseSeedRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    require_instructor_or_admin(current_user)
+    from app.seeds.seed_general_course import seed_course_by_code
+
+    result = await seed_course_by_code(
+        session=db,
+        course_code=payload.code,
+        title=payload.title,
+        description=payload.description,
+    )
+    return result
+
+
+@router.post("/seed/{course_code}", status_code=status.HTTP_201_CREATED)
+async def seed_course_by_code_endpoint(
+    course_code: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    require_instructor_or_admin(current_user)
+    from app.seeds.seed_general_course import seed_course_by_code
+
+    result = await seed_course_by_code(session=db, course_code=course_code)
     return result
