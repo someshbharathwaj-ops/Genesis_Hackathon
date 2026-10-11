@@ -56,6 +56,7 @@ export function RevisorTab({
   const [questions, setQuestions] = useState<QuestionResponse[]>([]);
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionResponse | null>(null);
   const [loadingQuestions, setLoadingQuestions] = useState<boolean>(false);
+  const [selectedTopicId, setSelectedTopicId] = useState<string>("ALL");
   const [selectedObjectiveId, setSelectedObjectiveId] = useState<string>("");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [assessmentContext, setAssessmentContext] =
@@ -71,6 +72,7 @@ export function RevisorTab({
   );
   const [queryTopic, setQueryTopic] = useState<string>("Transitive functional dependencies");
   const [auditObjectiveId, setAuditObjectiveId] = useState<string>("");
+  const [auditQuestionId, setAuditQuestionId] = useState<string>("");
   const [checkDeterministicLogic, setCheckDeterministicLogic] = useState<boolean>(true);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [reviewResult, setReviewResult] = useState<RevisorReviewResponse | null>(null);
@@ -79,6 +81,67 @@ export function RevisorTab({
 
   // Flatten objectives for selectors
   const allObjectives: LearningObjectiveResponse[] = topics.flatMap((t) => t.objectives);
+
+  const displayedObjectives =
+    selectedTopicId === "ALL"
+      ? allObjectives
+      : (topics.find((t) => t.id === selectedTopicId)?.objectives || allObjectives);
+
+  // Dynamic sample claims tailored to question
+  const getClaims = (q: QuestionResponse | null) => {
+    if (!q) {
+      if (course?.code === "CS301") {
+        return {
+          valid: "Deadlock occurs if and only if Mutual Exclusion, Hold & Wait, No Preemption, and Circular Wait all hold simultaneously.",
+          contradiction: "Breaking mutual exclusion alone is insufficient; all four Coffman conditions must be broken to prevent deadlock.",
+          ungrounded: "Quantum entanglement between threads eliminates CPU scheduling context switch delays."
+        };
+      }
+      return {
+        valid: "Given R(A, B, C, D) with F = {A -> B, B -> C}, attribute closure {A}+ includes {A, B, C} via transitivity.",
+        contradiction: "Under Armstrong axioms, the closure of {A} under A -> B unconditionally contains {A, B, C, D}.",
+        ungrounded: "Quantum database qubits replace classical primary keys to optimize Bell states."
+      };
+    }
+    const t = q.title.toLowerCase();
+    const v = q.versions[0];
+    if (t.includes("deadlock") || t.includes("coffman")) {
+      return {
+        valid: "Deadlock can occur if and only if all four Coffman conditions hold: Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait.",
+        contradiction: "A single directed cycle in a multi-instance resource graph is a sufficient guarantee that deadlock has occurred.",
+        ungrounded: "Cosmic microwave background noise automatically arbitrates resource lock acquisition."
+      };
+    } else if (t.includes("scheduling") || t.includes("sjf") || t.includes("srtf")) {
+      return {
+        valid: "Shortest Job First provably minimizes average waiting time by scheduling the process with the shortest CPU burst first.",
+        contradiction: "First-Come First-Served scheduling provably minimizes average waiting time across all arbitrary burst workloads.",
+        ungrounded: "Warp speed thread execution removes all CPU burst time calculation requirements."
+      };
+    } else if (t.includes("synchronization") || t.includes("peterson") || t.includes("semaphore")) {
+      return {
+        valid: "Peterson's solution guarantees mutual exclusion, progress, and bounded waiting using shared flag and turn variables.",
+        contradiction: "Peterson's solution allows both processes to simultaneously enter their critical sections whenever turn is equal to 0.",
+        ungrounded: "Telepathic bus snooping eliminates race conditions without atomic instructions."
+      };
+    } else if (t.includes("paging") || t.includes("tlb") || t.includes("memory")) {
+      return {
+        valid: "Paging divides logical memory into fixed-size pages and physical memory into frames, eliminating external fragmentation.",
+        contradiction: "Paging suffers from severe external fragmentation because variable-length allocations fragment free physical frames.",
+        ungrounded: "Sub-atomic liquid RAM bypasses page table address translation."
+      };
+    } else if (t.includes("closure")) {
+      return {
+        valid: "Attribute closure {X}+ iteratively collects all attributes determined by functional dependencies in F starting from X.",
+        contradiction: "Attribute closure can only remove attributes from the starting set and can never derive new attributes.",
+        ungrounded: "Blockchain consensus algorithms compute relational attribute closures."
+      };
+    }
+    return {
+      valid: v?.explanation ? v.explanation.slice(0, 150) : `In ${q.title}, the formal property verified in syllabus lecture notes holds strictly.`,
+      contradiction: `In ${q.title}, the opposite condition holds contrary to standard syllabus definitions.`,
+      ungrounded: `Speculative dark matter compute governs ${q.title}.`
+    };
+  };
 
   // Initialize selected objective
   useEffect(() => {
@@ -183,21 +246,17 @@ export function RevisorTab({
   };
 
   const setSampleClaim = (type: "valid" | "contradiction" | "ungrounded") => {
+    const targetQ = questions.find((q) => q.id === auditQuestionId) || selectedQuestion;
+    const claims = getClaims(targetQ);
     if (type === "valid") {
-      setCandidateText(
-        "Given R(A, B, C, D) with F = {A -> B, B -> C}, attribute closure {A}+ includes {A, B, C} via transitivity."
-      );
-      setQueryTopic("Transitive functional dependencies");
+      setCandidateText(claims.valid);
+      setQueryTopic(targetQ ? targetQ.title : "Verified Syllabus Concepts");
     } else if (type === "contradiction") {
-      setCandidateText(
-        "Given R(A, B, C) with dependencies A -> B and B -> C, the attribute closure of {A}+ under {A -> B} is {A, B, C, D}."
-      );
-      setQueryTopic("Attribute closure contradiction");
+      setCandidateText(claims.contradiction);
+      setQueryTopic(targetQ ? `${targetQ.title} (Contradiction)` : "Contradiction Check");
     } else {
-      setCandidateText(
-        "In quantum relational database systems, qubits replace classical primary keys to optimize Bell states."
-      );
-      setQueryTopic("Quantum databases");
+      setCandidateText(claims.ungrounded);
+      setQueryTopic("Ungrounded Speculation");
     }
   };
 
@@ -304,10 +363,50 @@ export function RevisorTab({
                 </div>
               </div>
 
+              {/* DAG Topic Cluster Filter */}
+              {topics.length > 1 && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="text-xs font-bold text-ink-muted uppercase tracking-wider flex items-center justify-between">
+                    <span>Curriculum DAG Cluster:</span>
+                    <span className="font-mono text-[10px] text-brand-cyan font-bold">
+                      {selectedTopicId === "ALL" ? "All Topics" : topics.find(t => t.id === selectedTopicId)?.code}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTopicId("ALL")}
+                      className={`tactile-btn-white text-[11px] py-1 px-2.5 font-bold ${
+                        selectedTopicId === "ALL" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+                      }`}
+                    >
+                      All DAGs ({topics.length})
+                    </button>
+                    {topics.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTopicId(t.id);
+                          if (t.objectives.length > 0) {
+                            setSelectedObjectiveId(t.objectives[0].id);
+                          }
+                        }}
+                        className={`tactile-btn-white text-[11px] py-1 px-2.5 font-bold ${
+                          selectedTopicId === t.id ? "!bg-brand-cyan !text-ink !shadow-hard-sm" : ""
+                        }`}
+                      >
+                        DAG #{t.order_index}: {t.code}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Learning Objective Selector */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-ink flex items-center justify-between">
-                  <span>Curriculum DAG Objective:</span>
+                  <span>Learning Objective:</span>
                   {activeObj?.prerequisite_objective_ids &&
                     activeObj.prerequisite_objective_ids.length > 0 && (
                       <span className="text-[10px] text-ink-muted">
@@ -320,7 +419,7 @@ export function RevisorTab({
                   onChange={(e) => setSelectedObjectiveId(e.target.value)}
                   className="tactile-select text-xs font-bold"
                 >
-                  {allObjectives.map((obj) => (
+                  {displayedObjectives.map((obj) => (
                     <option key={obj.id} value={obj.id}>
                       {obj.title} ({obj.code})
                     </option>
@@ -386,14 +485,80 @@ export function RevisorTab({
                   {currentVersion.prompt}
                 </div>
 
+                {/* Multiple Choice / Select Clickable Options */}
+                {currentVersion.options && currentVersion.options.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-ink-muted">Select Option:</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {(currentVersion.options as Array<{ id?: string; text?: string }>).map((opt) => {
+                        const optId = String(opt.id || "");
+                        const optText = String(opt.text || "");
+                        const isChosen =
+                          selectedQuestion.question_type === "multiple_select"
+                            ? answerInput.toUpperCase().includes(optId.toUpperCase())
+                            : answerInput.trim().toUpperCase() === optId.toUpperCase();
+                        return (
+                          <button
+                            key={optId}
+                            type="button"
+                            onClick={() => {
+                              if (selectedQuestion.question_type === "multiple_select") {
+                                const currentParts = answerInput
+                                  .split(",")
+                                  .map((s) => s.trim().toUpperCase())
+                                  .filter(Boolean);
+                                const exists = currentParts.includes(optId.toUpperCase());
+                                const nextParts = exists
+                                  ? currentParts.filter((p) => p !== optId.toUpperCase())
+                                  : [...currentParts, optId.toUpperCase()].sort();
+                                setAnswerInput(nextParts.join(", "));
+                              } else {
+                                setAnswerInput(optId);
+                              }
+                            }}
+                            className={`p-3 text-left border-2 border-ink rounded-friendly-sm text-xs transition-all ${
+                              isChosen
+                                ? "bg-brand-yellow font-black shadow-hard-sm border-ink"
+                                : "bg-surface hover:bg-surface-warm font-medium"
+                            }`}
+                          >
+                            <span className="font-mono font-black mr-2 bg-ink/10 px-1.5 py-0.5 rounded">
+                              {optId}
+                            </span>
+                            <span>{optText}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Answer Submission Form */}
                 <div className="flex flex-col gap-3">
-                  <label className="text-xs font-bold text-ink">Your Answer:</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-ink">Your Answer:</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubView("audit");
+                        setAuditQuestionId(selectedQuestion.id);
+                        setAuditObjectiveId(selectedQuestion.objective_id);
+                        const claims = getClaims(selectedQuestion);
+                        setCandidateText(claims.valid);
+                        setQueryTopic(selectedQuestion.title);
+                      }}
+                      className="tactile-btn-white text-[11px] py-1 px-2.5 flex items-center gap-1.5 font-bold hover:!bg-brand-coral hover:!text-white"
+                      title="Audit your conceptual explanation for this exact question"
+                    >
+                      <FileCheck2 className="w-3.5 h-3.5 text-brand-coral" />
+                      <span>Audit Explanation on this Question</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={answerInput}
                     onChange={(e) => setAnswerInput(e.target.value)}
-                    placeholder="Enter answer (e.g. A, B, C, D)"
+                    placeholder="Enter answer (or click options above)"
                     className="tactile-input text-xs font-mono"
                     disabled={isSubmitting}
                   />
@@ -531,30 +696,64 @@ export function RevisorTab({
                 <span>Submit Conceptual Explanation for Audit</span>
               </div>
 
+              {/* Target Question Selector for Audit */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-ink">Audit Concept for Question:</label>
+                  <span className="text-[10px] text-brand-coral font-bold">
+                    {auditQuestionId ? "Linked to Question" : "General Topic Concept"}
+                  </span>
+                </div>
+                <select
+                  value={auditQuestionId}
+                  onChange={(e) => {
+                    const qId = e.target.value;
+                    setAuditQuestionId(qId);
+                    const found = questions.find((q) => q.id === qId);
+                    if (found) {
+                      setAuditObjectiveId(found.objective_id);
+                      const claims = getClaims(found);
+                      setCandidateText(claims.valid);
+                      setQueryTopic(found.title);
+                    }
+                  }}
+                  className="tactile-select text-xs font-bold"
+                >
+                  <option value="">General Topic Concept (No specific question)</option>
+                  {questions.map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {q.title} ({q.question_type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Sample Prompts */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-ink-muted">Quick Sample Claims:</label>
+                <label className="text-xs font-bold text-ink-muted">
+                  Quick Sample Claims (Dynamically Tailored to Target Question):
+                </label>
                 <div className="flex flex-col gap-1.5 text-xs">
                   <button
                     type="button"
                     onClick={() => setSampleClaim("valid")}
                     className="p-2 border border-brand-green/30 rounded bg-brand-green/10 hover:bg-brand-green/20 text-left text-[11px] font-medium"
                   >
-                    &quot;Attribute closure includes &#123;A, B, C&#125; via transitivity&quot; (Valid)
+                    &quot;{getClaims(questions.find(q => q.id === auditQuestionId) || selectedQuestion).valid}&quot; (Valid)
                   </button>
                   <button
                     type="button"
                     onClick={() => setSampleClaim("contradiction")}
                     className="p-2 border border-brand-coral/40 rounded bg-brand-coral/10 hover:bg-brand-coral/20 text-left text-[11px] font-bold text-brand-coral"
                   >
-                    &quot;Closure of &#123;A&#125; under A-&gt;B is &#123;A, B, C, D&#125;&quot; (Contradiction)
+                    &quot;{getClaims(questions.find(q => q.id === auditQuestionId) || selectedQuestion).contradiction}&quot; (Contradiction)
                   </button>
                   <button
                     type="button"
                     onClick={() => setSampleClaim("ungrounded")}
                     className="p-2 border border-ink/20 rounded bg-surface hover:bg-surface-warm text-left text-[11px] font-medium"
                   >
-                    &quot;Quantum database qubits replace primary keys&quot; (Ungrounded)
+                    &quot;{getClaims(questions.find(q => q.id === auditQuestionId) || selectedQuestion).ungrounded}&quot; (Ungrounded)
                   </button>
                 </div>
               </div>

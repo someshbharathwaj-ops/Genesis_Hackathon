@@ -100,17 +100,7 @@ async def verify_course_access(
     if not course:
         raise ResourceNotFoundError("Course", course_id)
 
-    if user.role == UserRole.ADMIN:
-        return course
-
-    if user.role == UserRole.INSTRUCTOR:
-        if course.instructor_id is not None and course.instructor_id != user.id:
-            raise RecallException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                code="FORBIDDEN",
-                title="Course Access Denied",
-                detail=f"Instructor '{user.full_name}' is not assigned to course '{course.code}'.",
-            )
+    if user.role in (UserRole.ADMIN, UserRole.INSTRUCTOR):
         return course
 
     # Student verification

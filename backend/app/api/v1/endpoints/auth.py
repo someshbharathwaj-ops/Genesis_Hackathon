@@ -62,9 +62,17 @@ async def demo_login(
         course = await course_repo.get_by_code(payload.course_code)
 
     # 2. Select demo identity
-    if payload.role.lower() == "instructor":
-        email = "instructor.dbms@recall.edu"
-        full_name = "Prof. E. F. Codd"
+    if payload.role.lower() == "admin":
+        email = "admin.audit@recall.edu"
+        full_name = "Auditor Ada (System Administrator)"
+        role = UserRole.ADMIN
+    elif payload.role.lower() == "instructor":
+        if payload.course_code.upper() in ("CS301", "OS"):
+            email = "instructor.os@recall.edu"
+            full_name = "Prof. Andrew Tanenbaum"
+        else:
+            email = "instructor.dbms@recall.edu"
+            full_name = "Prof. E. F. Codd"
         role = UserRole.INSTRUCTOR
     else:
         email = "student.ada@recall.edu"

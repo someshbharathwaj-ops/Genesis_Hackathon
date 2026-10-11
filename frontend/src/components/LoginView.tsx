@@ -32,7 +32,7 @@ export function LoginView({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleDemoSignIn = async (role: "student" | "instructor") => {
+  const handleDemoSignIn = async (role: "student" | "instructor" | "admin") => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
@@ -139,20 +139,20 @@ export function LoginView({
             <label className="text-xs font-bold text-ink-muted">
               Select Demo Identity:
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 id="btn-demo-student"
                 type="button"
                 onClick={() => handleDemoSignIn("student")}
                 disabled={isLoading}
-                className="tactile-btn-white flex flex-col items-start p-3 text-left hover:border-brand-yellow"
+                className="tactile-btn-white flex flex-col items-start p-2.5 text-left hover:border-brand-yellow"
               >
                 <div className="flex items-center gap-1.5 text-xs font-black text-ink">
-                  <GraduationCap className="w-4 h-4 text-brand-yellow" />
+                  <GraduationCap className="w-3.5 h-3.5 text-brand-yellow" />
                   <span>Student</span>
                 </div>
-                <span className="text-[10px] text-ink-muted font-medium mt-0.5">
-                  Ada Lovelace (CS340)
+                <span className="text-[10px] text-ink-muted font-medium mt-0.5 truncate w-full">
+                  Ada Lovelace
                 </span>
               </button>
 
@@ -161,14 +161,30 @@ export function LoginView({
                 type="button"
                 onClick={() => handleDemoSignIn("instructor")}
                 disabled={isLoading}
-                className="tactile-btn-white flex flex-col items-start p-3 text-left hover:border-brand-coral"
+                className="tactile-btn-white flex flex-col items-start p-2.5 text-left hover:border-brand-coral"
               >
                 <div className="flex items-center gap-1.5 text-xs font-black text-ink">
-                  <UserCheck className="w-4 h-4 text-brand-coral" />
+                  <UserCheck className="w-3.5 h-3.5 text-brand-coral" />
                   <span>Instructor</span>
                 </div>
-                <span className="text-[10px] text-ink-muted font-medium mt-0.5">
-                  Prof. E. F. Codd
+                <span className="text-[10px] text-ink-muted font-medium mt-0.5 truncate w-full">
+                  Prof. Faculty
+                </span>
+              </button>
+
+              <button
+                id="btn-demo-admin"
+                type="button"
+                onClick={() => handleDemoSignIn("admin")}
+                disabled={isLoading}
+                className="tactile-btn-white flex flex-col items-start p-2.5 text-left hover:border-brand-green"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-black text-ink">
+                  <Shield className="w-3.5 h-3.5 text-brand-green" />
+                  <span>Admin</span>
+                </div>
+                <span className="text-[10px] text-ink-muted font-medium mt-0.5 truncate w-full">
+                  Auditor Console
                 </span>
               </button>
             </div>

@@ -39,6 +39,7 @@ import { Navbar } from "../components/Navbar";
 import { RevisorTab } from "../components/RevisorTab";
 import { SchedulingTab } from "../components/SchedulingTab";
 import { TutorTab } from "../components/TutorTab";
+import { AdminAuditDashboard } from "../components/AdminAuditDashboard";
 
 type MentorMode = "tutor" | "revisor";
 type ActiveTab =
@@ -47,7 +48,8 @@ type ActiveTab =
   | "curriculum"
   | "mastery"
   | "scheduling"
-  | "teacher_knowledge";
+  | "teacher_knowledge"
+  | "admin_audit";
 
 export default function HomePage() {
   // Global Platform State
@@ -130,11 +132,14 @@ export default function HomePage() {
   };
 
   // Demo Login Handler
-  const handleDemoLogin = async (role: "student" | "instructor") => {
+  const handleDemoLogin = async (role: "student" | "instructor" | "admin") => {
     try {
       const resp = await recallApi.demoLogin(role, selectedCourse?.code || "CS340");
       setStoredToken(resp.access_token);
       setCurrentUser(resp.user);
+      if (resp.user.role === "admin") {
+        setActiveTab("admin_audit");
+      }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to switch demo identity.");
     }
@@ -240,8 +245,7 @@ export default function HomePage() {
     );
   }
 
-  const isInstructor =
-    currentUser?.role === "instructor" || currentUser?.role === "admin";
+  const isInstructor = currentUser?.role === "instructor";
 
   return (
     <div className="min-h-screen bg-background text-ink flex flex-col">
@@ -261,11 +265,20 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Main Mentor Interface */}
-      <div className="max-w-7xl mx-auto w-full px-4 py-6 flex flex-col gap-6">
-        {/* ============================================================== */}
-        {/* RECALL AI MENTOR WELCOME & DUAL-MODE SELECTION                 */}
-        {/* ============================================================== */}
+      {/* Main Content Router: Admin Console vs Student/Instructor Learning Platform */}
+      {currentUser?.role === "admin" ? (
+        <div className="max-w-7xl mx-auto w-full px-4 py-6 flex flex-col gap-6">
+          <AdminAuditDashboard
+            currentUser={currentUser}
+            courses={courses}
+            onRefreshCourses={initializePlatform}
+          />
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto w-full px-4 py-6 flex flex-col gap-6">
+          {/* ============================================================== */}
+          {/* RECALL AI MENTOR WELCOME & DUAL-MODE SELECTION                 */}
+          {/* ============================================================== */}
         <section className="tactile-card p-6 bg-surface flex flex-col gap-5">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-ink/10 pb-4">
             <div>
@@ -555,6 +568,7 @@ export default function HomePage() {
           )}
         </main>
       </div>
+      )}
 
       {/* Footer Gateway Info */}
       <footer className="mt-auto border-t-2 border-ink/10 bg-surface-warm/40 py-6 px-4">
