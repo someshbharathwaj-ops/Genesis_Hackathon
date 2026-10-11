@@ -545,9 +545,9 @@ export function PracticeTab({
                 </span>
               </div>
 
-              {/* Question Prompt */}
+              {/* Question Statement */}
               <div className="p-4 bg-surface-warm/40 border-2 border-ink rounded-friendly-sm">
-                <div className="text-xs font-bold text-ink-muted mb-1">PROMPT:</div>
+                <div className="text-xs font-bold text-ink-muted mb-1">QUESTION:</div>
                 <div className="text-sm font-black text-ink leading-relaxed">
                   {currentVersion.prompt}
                 </div>

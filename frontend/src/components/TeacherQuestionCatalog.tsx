@@ -406,9 +406,9 @@ export function TeacherQuestionCatalog({
                   </div>
                 </div>
 
-                {/* Prompt Body */}
+                {/* Question Statement */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-ink">Prompt Text:</label>
+                  <label className="text-xs font-bold text-ink">Question Statement:</label>
                   <div className="p-4 bg-surface-warm/40 border-2 border-ink rounded-friendly-sm text-xs font-mono whitespace-pre-wrap leading-relaxed">
                     {activeVer.prompt}
                   </div>

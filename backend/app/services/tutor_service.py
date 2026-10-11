@@ -107,12 +107,14 @@ class TutorService:
             prompt=prompt.user_prompt,
             system_prompt=prompt.system_prompt,
             temperature=0.2,
+            max_tokens=1024,
         )
 
         # 9. Format and validate structured pedagogical response
         structured_answer = GroundedTutorEngine.sanitize_and_structure_response(
             raw_text=model_resp.text,
             citations=prompt.citations,
+            query=query,
         )
 
         warning_msg = (

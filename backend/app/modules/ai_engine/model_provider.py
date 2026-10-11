@@ -148,7 +148,26 @@ class DeterministicMockLanguageModelProvider(BaseLanguageModelProvider):
             )
 
         # Generate a structured, syllabus-grounded pedagogical explanation
-        if "armstrong" in prompt.lower() or "functional dependenc" in prompt.lower():
+        if "3nf" in prompt.lower() or "employee_dept" in prompt.lower():
+            text = (
+                "### Verdict: Not in 3NF\n"
+                "The relation EMPLOYEE_DEPT is NOT in Third Normal Form (3NF).\n\n"
+                "### Candidate Key Analysis\n"
+                "• Emp_ID is the candidate key because its attribute closure {Emp_ID}+ = {Emp_ID, Emp_Name, Dept_ID, Dept_Name} determines all attributes.\n\n"
+                "### 3NF Violation Check\n"
+                "• In 3NF, for every non-trivial functional dependency X -> Y, X must be a superkey or Y must be a prime attribute.\n"
+                "• Emp_ID -> Emp_Name: Emp_ID is a superkey (Satisfies 3NF).\n"
+                "• Emp_ID -> Dept_ID: Emp_ID is a superkey (Satisfies 3NF).\n"
+                "• Dept_ID -> Dept_Name: Dept_ID is NOT a superkey and Dept_Name is NOT a prime attribute. This is a transitive dependency that violates 3NF.\n\n"
+                "### 3NF Decomposition\n"
+                "To eliminate the transitive dependency, decompose into two relations:\n"
+                "1. DEPARTMENT(Dept_ID, Dept_Name) with Primary Key: Dept_ID\n"
+                "2. EMPLOYEE(Emp_ID, Emp_Name, Dept_ID) with Primary Key: Emp_ID and Foreign Key: Dept_ID referencing DEPARTMENT\n\n"
+                "### Properties & Verification\n"
+                "• Lossless Join: EMPLOYEE ∩ DEPARTMENT = {Dept_ID}, which is the candidate key of DEPARTMENT.\n"
+                "• Dependency Preservation: All original functional dependencies are preserved across the decomposed tables."
+            )
+        elif "armstrong" in prompt.lower() or "functional dependenc" in prompt.lower():
             text = (
                 f"Based on your course materials {citation_str}, functional dependencies "
                 "represent integrity constraints where attributes uniquely determine "
@@ -209,8 +228,8 @@ class OllamaLanguageModelProvider(BaseLanguageModelProvider):
             "stream": False,
             "options": {
                 "temperature": temperature,
-                "num_predict": min(max_tokens, 450),
-                "repeat_penalty": 1.25,
+                "num_predict": max_tokens,
+                "repeat_penalty": 1.15,
                 "stop": [
                     "OFFICIAL COURSE EXCERPTS:",
                     "--- EXCERPT",
