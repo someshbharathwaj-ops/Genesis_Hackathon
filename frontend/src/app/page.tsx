@@ -8,11 +8,14 @@ import {
   Compass,
   FileCheck2,
   FileText,
+  GraduationCap,
   HelpCircle,
   Layers,
+  Lock,
   MessageSquare,
   ShieldCheck,
   Sparkles,
+  Users,
 } from "lucide-react";
 import {
   clearStoredToken,
@@ -22,31 +25,29 @@ import {
 } from "../lib/api-client";
 import {
   CourseResponse,
-  DiagnosticSessionPlanResponse,
   HealthResponse,
   LearningObjectiveResponse,
   ReadinessResponse,
-  RetentionSessionPlanResponse,
   TopicResponse,
   UserResponse,
 } from "../types";
 import { CurriculumTab } from "../components/CurriculumTab";
 import { KnowledgeTab } from "../components/KnowledgeTab";
+import { LoginView } from "../components/LoginView";
 import { MasteryDiagnosisTab } from "../components/MasteryDiagnosisTab";
 import { Navbar } from "../components/Navbar";
-import { PracticeTab } from "../components/PracticeTab";
 import { RevisorTab } from "../components/RevisorTab";
 import { SchedulingTab } from "../components/SchedulingTab";
 import { TutorTab } from "../components/TutorTab";
 
+type MentorMode = "tutor" | "revisor";
 type ActiveTab =
-  | "curriculum"
-  | "mastery"
-  | "knowledge"
-  | "practice"
   | "tutor"
   | "revisor"
-  | "scheduling";
+  | "curriculum"
+  | "mastery"
+  | "scheduling"
+  | "teacher_knowledge";
 
 export default function HomePage() {
   // Global Platform State
@@ -57,14 +58,16 @@ export default function HomePage() {
   const [selectedCourse, setSelectedCourse] = useState<CourseResponse | null>(null);
   const [topics, setTopics] = useState<TopicResponse[]>([]);
 
-  // Navigation State
-  const [activeTab, setActiveTab] = useState<ActiveTab>("curriculum");
+  // Navigation & Mode State
+  const [mentorMode, setMentorMode] = useState<MentorMode>("tutor");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("tutor");
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
   const [activeScoredAssessmentId, setActiveScoredAssessmentId] = useState<string | null>(null);
   const [targetObjectiveForPractice, setTargetObjectiveForPractice] =
     useState<LearningObjectiveResponse | null>(null);
+  const [authInitialized, setAuthInitialized] = useState<boolean>(false);
 
-  // Initialize Auth & Data
+  // Initialize Platform
   const initializePlatform = async () => {
     try {
       const [healthData, readyData] = await Promise.all([
@@ -89,7 +92,6 @@ export default function HomePage() {
       // Fetch Courses
       let courseList = await recallApi.listCourses().catch(() => []);
       if (courseList.length === 0) {
-        // Auto-seed DBMS course if empty catalog
         try {
           await recallApi.seedDbmsCourse();
           courseList = await recallApi.listCourses();
@@ -105,19 +107,10 @@ export default function HomePage() {
         const topList = await recallApi.getCourseTopics(primary.id).catch(() => []);
         setTopics(topList);
       }
-
-      // If no user is logged in, perform seamless demo student login
-      if (!token) {
-        try {
-          const demoResp = await recallApi.demoLogin("student", "CS340");
-          setStoredToken(demoResp.access_token);
-          setCurrentUser(demoResp.user);
-        } catch {
-          // ignore offline probe
-        }
-      }
     } catch (err) {
-      console.error("Initialization error:", err);
+      console.error("Platform initialization error:", err);
+    } finally {
+      setAuthInitialized(true);
     }
   };
 
@@ -125,7 +118,7 @@ export default function HomePage() {
     initializePlatform();
   }, []);
 
-  // Course Selection Change Handler
+  // Course Selection Handler
   const handleSelectCourse = async (course: CourseResponse) => {
     setSelectedCourse(course);
     try {
@@ -147,10 +140,12 @@ export default function HomePage() {
     }
   };
 
-  // Logout Handler
+  // Logout Handler: Fully clears client session and redirects to LoginView
   const handleLogout = () => {
     clearStoredToken();
     setCurrentUser(null);
+    setActiveTab("tutor");
+    setMentorMode("tutor");
   };
 
   // Seed DBMS Handler
@@ -163,13 +158,53 @@ export default function HomePage() {
       if (courseList.length > 0) {
         handleSelectCourse(courseList[0]);
       }
-      alert("Successfully seeded CS340 DBMS curriculum and verified question bank!");
+      alert("Successfully seeded CS340 DBMS curriculum, verified questions, and authoritative knowledge base!");
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to seed course.");
     } finally {
       setIsSeeding(false);
     }
   };
+
+  // Mode Switching Handlers
+  const handleSwitchMode = (mode: MentorMode) => {
+    setMentorMode(mode);
+    setActiveTab(mode);
+  };
+
+  const handleSwitchToRevisorWithObjective = (obj: LearningObjectiveResponse) => {
+    setTargetObjectiveForPractice(obj);
+    setMentorMode("revisor");
+    setActiveTab("revisor");
+  };
+
+  // Render Gate: Loading check while verifying session
+  if (!authInitialized) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="font-bold text-sm text-ink animate-pulse">
+          Loading Recall AI Mentor...
+        </div>
+      </div>
+    );
+  }
+
+  // Render Gate: If unauthenticated, show clean institutional Sign-In screen
+  if (!currentUser) {
+    return (
+      <LoginView
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setActiveTab("tutor");
+          setMentorMode("tutor");
+        }}
+        selectedCourseCode={selectedCourse?.code || "CS340"}
+      />
+    );
+  }
+
+  const isInstructor =
+    currentUser?.role === "instructor" || currentUser?.role === "admin";
 
   return (
     <div className="min-h-screen bg-background text-ink flex flex-col">
@@ -188,9 +223,194 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Main Tabbed Navigation */}
-      <div className="max-w-7xl mx-auto w-full px-4 py-6">
-        <nav className="flex flex-wrap items-center gap-2 pb-4 border-b-2 border-ink/10">
+      {/* Main Mentor Interface */}
+      <div className="max-w-7xl mx-auto w-full px-4 py-6 flex flex-col gap-6">
+        {/* ============================================================== */}
+        {/* RECALL AI MENTOR WELCOME & DUAL-MODE SELECTION                 */}
+        {/* ============================================================== */}
+        <section className="tactile-card p-6 bg-surface flex flex-col gap-5">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-ink/10 pb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="tactile-tag bg-brand-yellow text-ink text-xs font-black">
+                  AI MENTOR PLATFORM
+                </span>
+                <span className="text-xs font-bold text-ink-muted">
+                  Course: {selectedCourse?.code || "CS340"} &mdash; {selectedCourse?.title || "DBMS"}
+                </span>
+              </div>
+              <h1 className="text-2xl font-black text-ink">
+                Welcome, {currentUser?.full_name || "Student"}!
+              </h1>
+              <p className="text-xs text-ink-muted font-medium mt-0.5">
+                Choose how you want to learn today. Seamlessly switch between conceptual teaching and practice while preserving course progress.
+              </p>
+            </div>
+
+            {/* Current Active Mode Indicator */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-ink-muted">Current Mode:</span>
+              <span
+                className={`tactile-tag text-xs font-black uppercase ${
+                  mentorMode === "tutor"
+                    ? "bg-brand-yellow text-ink"
+                    : "bg-brand-coral text-white"
+                }`}
+              >
+                {mentorMode === "tutor" ? "Mode A: Tutor" : "Mode B: Revisor"}
+              </span>
+            </div>
+          </div>
+
+          {/* Two Large Differentiated Mode Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Card A: Tutor Mode */}
+            <div
+              onClick={() => handleSwitchMode("tutor")}
+              className={`p-5 rounded-friendly border-2 border-ink cursor-pointer transition-all ${
+                mentorMode === "tutor"
+                  ? "bg-brand-yellow/20 border-brand-yellow shadow-hard"
+                  : "bg-surface hover:bg-surface-warm"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-friendly-sm bg-brand-yellow border-2 border-ink flex items-center justify-center font-black text-ink shadow-hard-sm">
+                    <MessageSquare className="w-5 h-5 text-ink" />
+                  </div>
+                  <div>
+                    <span className="tactile-tag bg-brand-yellow text-ink text-[10px] font-black">
+                      MODE A &bull; TEACH &amp; EXPLAIN
+                    </span>
+                    <h2 className="text-lg font-black text-ink mt-0.5">Grounded AI Tutor</h2>
+                  </div>
+                </div>
+                <span
+                  className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                    mentorMode === "tutor"
+                      ? "bg-brand-yellow text-ink border-ink font-black"
+                      : "bg-surface text-ink-muted border-ink/20"
+                  }`}
+                >
+                  {mentorMode === "tutor" ? "ACTIVE" : "SELECT"}
+                </span>
+              </div>
+              <p className="text-xs text-ink-muted font-medium mt-3 leading-relaxed">
+                Understand concepts from the ground up, ask follow-up questions, request analogies, and receive step-by-step explanations with exact citations to verified course materials.
+              </p>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-ink/10 text-[11px] font-bold text-ink">
+                <Sparkles className="w-3.5 h-3.5 text-brand-yellow" />
+                <span>Zero Grading Authority &bull; Strict Abstention Policy</span>
+              </div>
+            </div>
+
+            {/* Card B: Revisor Mode */}
+            <div
+              onClick={() => handleSwitchMode("revisor")}
+              className={`p-5 rounded-friendly border-2 border-ink cursor-pointer transition-all ${
+                mentorMode === "revisor"
+                  ? "bg-brand-coral/15 border-brand-coral shadow-hard"
+                  : "bg-surface hover:bg-surface-warm"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-friendly-sm bg-brand-coral border-2 border-ink flex items-center justify-center font-black text-white shadow-hard-sm">
+                    <ShieldCheck className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <span className="tactile-tag bg-brand-coral text-white text-[10px] font-black">
+                      MODE B &bull; PRACTISE &amp; TEST
+                    </span>
+                    <h2 className="text-lg font-black text-ink mt-0.5">Adaptive Revisor</h2>
+                  </div>
+                </div>
+                <span
+                  className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                    mentorMode === "revisor"
+                      ? "bg-brand-coral text-white border-ink font-black"
+                      : "bg-surface text-ink-muted border-ink/20"
+                  }`}
+                >
+                  {mentorMode === "revisor" ? "ACTIVE" : "SELECT"}
+                </span>
+              </div>
+              <p className="text-xs text-ink-muted font-medium mt-3 leading-relaxed">
+                Practise deterministic questions across all 5 DBMS objectives, take mock assessments, audit conceptual explanations against course notes, and follow personalized revision schedules.
+              </p>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-ink/10 text-[11px] font-bold text-ink">
+                <Lock className="w-3.5 h-3.5 text-brand-coral" />
+                <span>Deterministic Mathematical Grader &bull; Exam Lockout Protected</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ============================================================== */}
+        {/* PERSISTENT VISUAL MODE BANNER                                  */}
+        {/* ============================================================== */}
+        <div
+          className={`p-4 rounded-friendly-sm border-2 border-ink flex flex-wrap items-center justify-between gap-3 shadow-hard-sm ${
+            mentorMode === "tutor"
+              ? "bg-brand-yellow/15 border-brand-yellow"
+              : "bg-brand-coral/15 border-brand-coral"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className={`tactile-tag text-xs font-black ${
+                mentorMode === "tutor"
+                  ? "bg-brand-yellow text-ink"
+                  : "bg-brand-coral text-white"
+              }`}
+            >
+              {mentorMode === "tutor" ? "TUTOR MODE ENGAGED" : "REVISOR MODE ENGAGED"}
+            </span>
+            <span className="text-xs font-bold text-ink">
+              {mentorMode === "tutor"
+                ? "Syllabus Explainer active &bull; Course evidence bound &bull; Phi-3 Mini"
+                : "Practice & Audit active &bull; Pure deterministic grader authority &bull; Prerequisite aware"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleSwitchMode(mentorMode === "tutor" ? "revisor" : "tutor")}
+              className="tactile-btn-white text-xs py-1.5 px-3 font-bold"
+            >
+              <span>Switch to {mentorMode === "tutor" ? "Revisor Mode" : "Tutor Mode"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Secondary Navigation Bar */}
+        <nav className="flex flex-wrap items-center gap-2 pb-2 border-b-2 border-ink/10">
+          <button
+            onClick={() => {
+              setActiveTab("tutor");
+              setMentorMode("tutor");
+            }}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "tutor" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-brand-yellow" />
+            <span>AI Tutor</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("revisor");
+              setMentorMode("revisor");
+            }}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "revisor" ? "!bg-brand-coral !text-white !shadow-hard-sm" : ""
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-brand-coral" />
+            <span>Revisor (Practice &amp; Audit)</span>
+          </button>
+
           <button
             onClick={() => setActiveTab("curriculum")}
             className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
@@ -198,7 +418,7 @@ export default function HomePage() {
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Curriculum & Overview</span>
+            <span>Curriculum DAG</span>
           </button>
 
           <button
@@ -208,47 +428,7 @@ export default function HomePage() {
             }`}
           >
             <Brain className="w-3.5 h-3.5 text-brand-green" />
-            <span>Mastery & Diagnosis</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("knowledge")}
-            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
-              activeTab === "knowledge" ? "!bg-brand-yellow !shadow-hard-sm" : ""
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5 text-brand-cyan" />
-            <span>Knowledge & Materials</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("practice")}
-            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
-              activeTab === "practice" ? "!bg-brand-yellow !shadow-hard-sm" : ""
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-brand-coral" />
-            <span>Practice & Lockout</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("tutor")}
-            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
-              activeTab === "tutor" ? "!bg-brand-yellow !shadow-hard-sm" : ""
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5 text-brand-yellow" />
-            <span>AI Tutor (SLM A)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("revisor")}
-            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
-              activeTab === "revisor" ? "!bg-brand-yellow !shadow-hard-sm" : ""
-            }`}
-          >
-            <FileCheck2 className="w-3.5 h-3.5 text-brand-coral" />
-            <span>Revisor Audit (SLM B)</span>
+            <span>Mastery &amp; Diagnosis</span>
           </button>
 
           <button
@@ -258,46 +438,25 @@ export default function HomePage() {
             }`}
           >
             <Calendar className="w-3.5 h-3.5 text-brand-cyan" />
-            <span>Spaced Scheduling (Rule 6)</span>
+            <span>Revision Schedule (Rule 6)</span>
           </button>
+
+          {/* Instructor-Only Classroom Materials Tab */}
+          {isInstructor && (
+            <button
+              onClick={() => setActiveTab("teacher_knowledge")}
+              className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+                activeTab === "teacher_knowledge" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-brand-cyan" />
+              <span>Instructor Materials &amp; Uploads</span>
+            </button>
+          )}
         </nav>
 
         {/* Tab Content Display */}
-        <main className="mt-6 pb-16">
-          {activeTab === "curriculum" && (
-            <CurriculumTab
-              course={selectedCourse}
-              topics={topics}
-              onSelectObjectiveForPractice={(obj) => {
-                setTargetObjectiveForPractice(obj);
-                setActiveTab("practice");
-              }}
-            />
-          )}
-
-          {activeTab === "mastery" && (
-            <MasteryDiagnosisTab
-              course={selectedCourse}
-              currentUser={currentUser}
-              onStartProbingPlan={() => {
-                setActiveTab("practice");
-              }}
-            />
-          )}
-
-          {activeTab === "knowledge" && <KnowledgeTab course={selectedCourse} />}
-
-          {activeTab === "practice" && (
-            <PracticeTab
-              course={selectedCourse}
-              topics={topics}
-              currentUser={currentUser}
-              activeScoredAssessmentId={activeScoredAssessmentId}
-              setActiveScoredAssessmentId={setActiveScoredAssessmentId}
-              targetObjective={targetObjectiveForPractice}
-            />
-          )}
-
+        <main className="pb-16">
           {activeTab === "tutor" && (
             <TutorTab
               course={selectedCourse}
@@ -309,8 +468,36 @@ export default function HomePage() {
           {activeTab === "revisor" && (
             <RevisorTab
               course={selectedCourse}
+              topics={topics}
               currentUser={currentUser}
               hasActiveScoredAssessment={!!activeScoredAssessmentId}
+              onToggleLockout={() =>
+                setActiveScoredAssessmentId((prev) =>
+                  prev ? null : "simulated-scored-assessment-in-progress"
+                )
+              }
+              targetObjective={targetObjectiveForPractice}
+            />
+          )}
+
+          {activeTab === "curriculum" && (
+            <CurriculumTab
+              course={selectedCourse}
+              topics={topics}
+              onSelectObjectiveForPractice={(obj) =>
+                handleSwitchToRevisorWithObjective(obj)
+              }
+            />
+          )}
+
+          {activeTab === "mastery" && (
+            <MasteryDiagnosisTab
+              course={selectedCourse}
+              currentUser={currentUser}
+              onStartProbingPlan={() => {
+                setMentorMode("revisor");
+                setActiveTab("revisor");
+              }}
             />
           )}
 
@@ -319,9 +506,14 @@ export default function HomePage() {
               course={selectedCourse}
               currentUser={currentUser}
               onStartRetentionSession={() => {
-                setActiveTab("practice");
+                setMentorMode("revisor");
+                setActiveTab("revisor");
               }}
             />
+          )}
+
+          {activeTab === "teacher_knowledge" && isInstructor && (
+            <KnowledgeTab course={selectedCourse} />
           )}
         </main>
       </div>
