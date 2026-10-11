@@ -67,9 +67,13 @@ export function clearStoredToken(): void {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
+export interface FetchApiOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
 export async function fetchApi<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: FetchApiOptions = {}
 ): Promise<T> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
@@ -85,9 +89,21 @@ export async function fetchApi<T>(
     headers.set("Content-Type", "application/json");
   }
 
+  // Generous timeouts for local SLM/LLM inference (Ollama phi3:mini), seeding, RAG, and grading
+  const isAiEndpoint =
+    endpoint.includes("/tutor/") ||
+    endpoint.includes("/revisor/") ||
+    endpoint.includes("/seed") ||
+    endpoint.includes("/attempts") ||
+    endpoint.includes("/knowledge/") ||
+    endpoint.includes("/documents");
+  const defaultTimeout = isAiEndpoint ? 120000 : 30000;
+  const timeoutMs = options.timeoutMs ?? defaultTimeout;
+
   const controller = new AbortController();
-  const timeoutMs = 8000;
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -122,12 +138,20 @@ export async function fetchApi<T>(
   } catch (err: unknown) {
     clearTimeout(timeoutId);
     if (err instanceof ApiError) throw err;
+    const isAbort =
+      (err instanceof DOMException && err.name === "AbortError") ||
+      (err instanceof Error && (err.name === "AbortError" || err.message.toLowerCase().includes("abort")));
+    const detailMsg = isAbort
+      ? `Request timed out after ${timeoutMs / 1000}s while waiting for AI generation. Local SLM inference may take longer under heavy load.`
+      : err instanceof Error
+      ? err.message
+      : "Network error or timeout";
     throw new ApiError({
       type: "about:blank",
-      title: "Network Request Error",
+      title: isAbort ? "Request Timeout" : "Network Request Error",
       status: 0,
-      detail: err instanceof Error ? err.message : "Network error or timeout",
-      code: "NETWORK_ERROR",
+      detail: detailMsg,
+      code: isAbort ? "TIMEOUT" : "NETWORK_ERROR",
       timestamp: new Date().toISOString(),
     });
   }
