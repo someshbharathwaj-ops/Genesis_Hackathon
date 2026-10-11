@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from app.models.document import CourseDocument, DocumentChunk  # noqa: F401
         from app.models.identity import Course, CourseEnrollment, User  # noqa: F401
         from app.models.question import Question, QuestionVersion  # noqa: F401
+        from app.models.assessment import InAppNotification, ScheduledAssessment  # noqa: F401
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

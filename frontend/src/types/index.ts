@@ -492,3 +492,36 @@ export interface AdminAuditLogEntry {
   verdict: "VERIFIED" | "REMEDIATION_NEEDED" | "BLOCKED_LOCKOUT" | "GROUNDED" | "CONTRADICTION" | "NEUTRAL";
   details: string;
 }
+
+export interface ScheduledAssessmentCreate {
+  title: string;
+  description?: string;
+  scheduled_at: string;
+  duration_minutes?: number;
+  target_objective_id?: string | null;
+}
+
+export interface ScheduledAssessmentResponse {
+  id: string;
+  course_id: string;
+  created_by_id: string;
+  title: string;
+  description: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  target_objective_id?: string | null;
+  status: string;
+  created_at?: string;
+}
+
+export interface InAppNotificationResponse {
+  id: string;
+  user_id: string;
+  course_id: string;
+  assessment_id?: string | null;
+  title: string;
+  message: string;
+  is_read: boolean;
+  notification_type: string;
+  created_at?: string;
+}

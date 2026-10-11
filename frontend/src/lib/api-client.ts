@@ -28,6 +28,9 @@ import {
   TokenResponse,
   TopicResponse,
   TutorQueryResponse,
+  ScheduledAssessmentCreate,
+  ScheduledAssessmentResponse,
+  InAppNotificationResponse,
 } from "../types";
 
 function getApiBaseUrl(): string {
@@ -327,4 +330,19 @@ export const recallApi = {
   getAdminAuditSummary: () => fetchApi<AdminAuditSummaryResponse>("/admin/audit-summary"),
   getAdminAuditLogs: (limit: number = 50) =>
     fetchApi<AdminAuditLogEntry[]>(`/admin/audit-logs?limit=${limit}`),
+
+  // Teacher Assessment Scheduling & In-App Notifications
+  scheduleAssessment: (courseId: string, payload: ScheduledAssessmentCreate) =>
+    fetchApi<ScheduledAssessmentResponse>(`/courses/${courseId}/assessments`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  listCourseAssessments: (courseId: string) =>
+    fetchApi<ScheduledAssessmentResponse[]>(`/courses/${courseId}/assessments`),
+  getStudentNotifications: (studentId: string) =>
+    fetchApi<InAppNotificationResponse[]>(`/students/${studentId}/notifications`),
+  markNotificationRead: (studentId: string, notificationId: string) =>
+    fetchApi<InAppNotificationResponse>(`/students/${studentId}/notifications/${notificationId}/read`, {
+      method: "POST",
+    }),
 };

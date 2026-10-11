@@ -1,7 +1,6 @@
-"use client";
-
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  Bell,
   BookOpen,
   CheckCircle2,
   GraduationCap,
@@ -16,7 +15,8 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { CourseResponse, UserResponse } from "../types";
+import { CourseResponse, InAppNotificationResponse, UserResponse } from "../types";
+import { recallApi } from "../lib/api-client";
 
 interface NavbarProps {
   currentUser: UserResponse | null;
@@ -48,6 +48,30 @@ export function Navbar({
   const [newCode, setNewCode] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [notifications, setNotifications] = useState<InAppNotificationResponse[]>([]);
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.id && currentUser.role === "student") {
+      recallApi.getStudentNotifications(currentUser.id).then(setNotifications).catch(() => {});
+      const interval = setInterval(() => {
+        recallApi.getStudentNotifications(currentUser.id).then(setNotifications).catch(() => {});
+      }, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser?.id, currentUser?.role]);
+
+  const unreadNotifs = notifications.filter((n) => !n.is_read);
+
+  const handleMarkRead = async (notifId: string) => {
+    if (!currentUser?.id) return;
+    try {
+      await recallApi.markNotificationRead(currentUser.id, notifId);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notifId ? { ...n, is_read: true } : n))
+      );
+    } catch {}
+  };
 
   return (
     <header className="tactile-card-warm p-4 md:p-5 flex flex-col gap-4">
@@ -133,6 +157,76 @@ export function Navbar({
           {/* User Auth Profile & Sign Out (Mandatory sign-out to switch role) */}
           {currentUser ? (
             <div className="flex items-center gap-2">
+              {/* In-App Notifications Bell for Students */}
+              {currentUser.role === "student" && (
+                <div className="relative">
+                  <button
+                    id="btn-notifications"
+                    onClick={() => setShowNotifMenu(!showNotifMenu)}
+                    className="tactile-btn-white text-xs py-1.5 px-2.5 flex items-center gap-1.5 font-bold relative"
+                    title="In-App Assessment Alerts"
+                  >
+                    <Bell className="w-3.5 h-3.5 text-ink" />
+                    {unreadNotifs.length > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-brand-coral text-white text-[9px] font-black flex items-center justify-center -ml-0.5">
+                        {unreadNotifs.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {showNotifMenu && (
+                    <div className="absolute right-0 mt-2 w-80 tactile-card p-3 z-50 flex flex-col gap-2 max-h-96 overflow-y-auto">
+                      <div className="flex items-center justify-between pb-2 border-b-2 border-ink/10">
+                        <span className="font-black text-xs text-ink flex items-center gap-1.5">
+                          <Bell className="w-3.5 h-3.5 text-brand-coral" />
+                          <span>Assessment Alerts</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-ink-muted">
+                          {unreadNotifs.length} Unread
+                        </span>
+                      </div>
+
+                      {notifications.length === 0 ? (
+                        <p className="text-xs text-ink-muted text-center py-4 font-medium">
+                          No alerts right now. You are fully up to date!
+                        </p>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            className={`p-2.5 rounded border text-xs flex flex-col gap-1 ${
+                              n.is_read
+                                ? "bg-surface-warm/30 border-ink/10 text-ink-muted"
+                                : "bg-white border-brand-coral shadow-hard-sm text-ink"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="font-bold text-ink text-[11px] leading-tight">
+                                {n.title}
+                              </span>
+                              {!n.is_read && (
+                                <button
+                                  onClick={() => handleMarkRead(n.id)}
+                                  className="text-[9px] font-black text-brand-coral hover:underline shrink-0"
+                                >
+                                  Mark Read
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-ink-muted leading-tight">{n.message}</p>
+                            {n.created_at && (
+                              <span className="text-[9px] text-ink-faint">
+                                {new Date(n.created_at).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="relative">
                 <button
                   id="btn-user-profile"
