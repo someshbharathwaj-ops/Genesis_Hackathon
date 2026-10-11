@@ -74,9 +74,7 @@ class SemanticChunker:
 
                     # If paragraph itself exceeds target_chunk_size, split by sentences
                     if len(para) > target_chunk_size:
-                        sub_chunks = cls._split_large_paragraph(
-                            para, target_chunk_size, overlap
-                        )
+                        sub_chunks = cls._split_large_paragraph(para, target_chunk_size, overlap)
                         for sub_text in sub_chunks:
                             approx_tokens = len(sub_text.split())
                             chunks.append(

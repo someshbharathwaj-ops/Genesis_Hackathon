@@ -181,7 +181,7 @@ def compute_minimal_cover(fds: list[FDType]) -> list[FDType]:
     i = 0
     while i < len(pool):
         current_fd = pool[i]
-        without_current = pool[:i] + pool[i + 1:]
+        without_current = pool[:i] + pool[i + 1 :]
         lhs, rhs = current_fd
         # If remaining FDs still imply current_fd, current_fd is redundant
         if rhs.issubset(compute_attribute_closure(lhs, without_current)):
@@ -227,8 +227,7 @@ def check_normal_form(
     fds onto relation_attrs.
     """
     needs_projection = any(
-        not lhs.issubset(relation_attrs) or not rhs.issubset(relation_attrs)
-        for lhs, rhs in fds
+        not lhs.issubset(relation_attrs) or not rhs.issubset(relation_attrs) for lhs, rhs in fds
     )
     effective_fds = project_fds(relation_attrs, fds) if needs_projection else fds
 

@@ -42,7 +42,7 @@ async def health_check() -> HealthResponse:
     description="Returns HTTP 200 if essential engines and dependencies are operational.",
 )
 async def readiness_check() -> ReadinessResponse:
-    # Phase 0 readiness reports engine registration status
+    model_status = "mock" if settings.USE_MOCK_LLM else f"live:{settings.PRIMARY_MODEL}"
     return ReadinessResponse(
         status="ready",
         engines={
@@ -50,5 +50,6 @@ async def readiness_check() -> ReadinessResponse:
             "knowledge_engine": "operational",
             "ai_execution_engine": "operational",
             "configuration": "valid",
+            "model_provider": model_status,
         },
     )

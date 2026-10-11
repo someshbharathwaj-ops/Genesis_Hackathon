@@ -1,18 +1,21 @@
 """initial schema for identity, curriculum, questions, attempts, and idempotency
 
 Revision ID: 001_initial_schema
-Revises: 
+Revises:
 Create Date: 2026-10-10 17:55:00.000000
 
 """
-from typing import Sequence, Union
-from alembic import op
+
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 
+from alembic import op
+
 revision: str = "001_initial_schema"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -42,7 +45,12 @@ def upgrade() -> None:
         sa.Column("code", sa.String(32), nullable=False, unique=True),
         sa.Column("title", sa.String(255), nullable=False),
         sa.Column("description", sa.String(1024), nullable=True),
-        sa.Column("instructor_id", sa.String(36), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "instructor_id",
+            sa.String(36),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
@@ -53,8 +61,15 @@ def upgrade() -> None:
     op.create_table(
         "course_enrollments",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("user_id", sa.String(36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("course_id", sa.String(36), sa.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.String(36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
+        sa.Column(
+            "course_id",
+            sa.String(36),
+            sa.ForeignKey("courses.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, default=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
@@ -67,7 +82,12 @@ def upgrade() -> None:
     op.create_table(
         "topics",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("course_id", sa.String(36), sa.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "course_id",
+            sa.String(36),
+            sa.ForeignKey("courses.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("code", sa.String(32), nullable=False),
         sa.Column("title", sa.String(255), nullable=False),
         sa.Column("description", sa.String(1024), nullable=True),
@@ -82,7 +102,12 @@ def upgrade() -> None:
     op.create_table(
         "learning_objectives",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("topic_id", sa.String(36), sa.ForeignKey("topics.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "topic_id",
+            sa.String(36),
+            sa.ForeignKey("topics.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("code", sa.String(64), nullable=False),
         sa.Column("title", sa.String(255), nullable=False),
         sa.Column("description", sa.String(1024), nullable=False),
@@ -99,11 +124,23 @@ def upgrade() -> None:
     op.create_table(
         "questions",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("objective_id", sa.String(36), sa.ForeignKey("learning_objectives.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "objective_id",
+            sa.String(36),
+            sa.ForeignKey("learning_objectives.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("title", sa.String(255), nullable=False),
         sa.Column(
             "question_type",
-            sa.Enum("multiple_choice", "multiple_select", "expression", "normalization_decomposition", "minimal_cover", name="questiontype"),
+            sa.Enum(
+                "multiple_choice",
+                "multiple_select",
+                "expression",
+                "normalization_decomposition",
+                "minimal_cover",
+                name="questiontype",
+            ),
             nullable=False,
             default="multiple_choice",
         ),
@@ -117,7 +154,12 @@ def upgrade() -> None:
     op.create_table(
         "question_versions",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("question_id", sa.String(36), sa.ForeignKey("questions.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "question_id",
+            sa.String(36),
+            sa.ForeignKey("questions.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("version_number", sa.Integer(), nullable=False, default=1),
         sa.Column("prompt", sa.Text(), nullable=False),
         sa.Column(
@@ -144,19 +186,42 @@ def upgrade() -> None:
         sa.UniqueConstraint("question_id", "version_number", name="uq_question_version_number"),
     )
     op.create_index("ix_question_versions_question_id", "question_versions", ["question_id"])
-    op.create_index("ix_question_versions_verification_status", "question_versions", ["verification_status"])
+    op.create_index(
+        "ix_question_versions_verification_status", "question_versions", ["verification_status"]
+    )
 
     # 8. attempts
     op.create_table(
         "attempts",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("idempotency_key", sa.String(64), nullable=False, unique=True),
-        sa.Column("student_id", sa.String(36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("question_id", sa.String(36), sa.ForeignKey("questions.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("question_version_id", sa.String(36), sa.ForeignKey("question_versions.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column(
+            "student_id",
+            sa.String(36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "question_id",
+            sa.String(36),
+            sa.ForeignKey("questions.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "question_version_id",
+            sa.String(36),
+            sa.ForeignKey("question_versions.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
         sa.Column(
             "assessment_context",
-            sa.Enum("diagnostic", "independent_checkpoint", "unscored_practice", "retention_review", name="assessmentcontext"),
+            sa.Enum(
+                "diagnostic",
+                "independent_checkpoint",
+                "unscored_practice",
+                "retention_review",
+                name="assessmentcontext",
+            ),
             nullable=False,
             default="diagnostic",
         ),
@@ -167,7 +232,9 @@ def upgrade() -> None:
         sa.Column("submitted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "status",
-            sa.Enum("in_progress", "graded", "regraded", "rejected_by_student", name="attemptstatus"),
+            sa.Enum(
+                "in_progress", "graded", "regraded", "rejected_by_student", name="attemptstatus"
+            ),
             nullable=False,
             default="graded",
         ),
@@ -175,7 +242,12 @@ def upgrade() -> None:
         sa.Column("score_achieved", sa.Float(), nullable=False),
         sa.Column("max_possible_score", sa.Float(), nullable=False),
         sa.Column("grading_provenance", sa.JSON(), nullable=False),
-        sa.Column("parent_attempt_id", sa.String(36), sa.ForeignKey("attempts.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "parent_attempt_id",
+            sa.String(36),
+            sa.ForeignKey("attempts.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )

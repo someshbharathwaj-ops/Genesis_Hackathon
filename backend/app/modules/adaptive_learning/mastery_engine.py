@@ -110,11 +110,7 @@ class MasteryEngine:
                 key=lambda a: (
                     a.created_at.timestamp()
                     if a.created_at is not None
-                    else (
-                        a.submitted_at.timestamp()
-                        if a.submitted_at is not None
-                        else 0.0
-                    )
+                    else (a.submitted_at.timestamp() if a.submitted_at is not None else 0.0)
                 ),
             )
 
@@ -147,9 +143,7 @@ class MasteryEngine:
 
         # 3. Compute Performance Score P_k in [0.0, 1.0]
         performance_score = (
-            weighted_score_sum / total_evidence_weight
-            if total_evidence_weight > 0
-            else 0.0
+            weighted_score_sum / total_evidence_weight if total_evidence_weight > 0 else 0.0
         )
         performance_score = round(max(0.0, min(1.0, performance_score)), 4)
 
@@ -161,9 +155,7 @@ class MasteryEngine:
         confidence_score = round(max(0.0, min(1.0, confidence_score)), 4)
 
         # 5. Evaluate Prerequisite Satisfaction (Rule 5: Hypothetical Prerequisites)
-        prereq_satisfied, blocked_by = cls._check_prerequisites(
-            objective, prerequisite_profiles
-        )
+        prereq_satisfied, blocked_by = cls._check_prerequisites(objective, prerequisite_profiles)
 
         # 6. Determine Mastery State Transition
         if confidence_score < cls.CONFIDENCE_THRESHOLD:

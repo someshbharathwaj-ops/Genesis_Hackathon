@@ -360,8 +360,7 @@ class SchedulingEngine:
             upcoming_eligible = [
                 item
                 for item in queue.items
-                if item.retention_eligible
-                and item.urgency_classification == ReviewUrgency.UPCOMING
+                if item.retention_eligible and item.urgency_classification == ReviewUrgency.UPCOMING
             ]
             eligible_items.extend(upcoming_eligible[: max_session_items - len(eligible_items)])
 
