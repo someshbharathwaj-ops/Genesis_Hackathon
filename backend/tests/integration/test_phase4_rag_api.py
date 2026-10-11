@@ -175,3 +175,55 @@ async def test_phase4_document_ingestion_and_rag_lifecycle(async_client: AsyncCl
     )
     assert empty_list_resp.status_code == 200
     assert len(empty_list_resp.json()) == 0
+
+
+@pytest.mark.integration
+async def test_phase4_markdown_document_ingestion(async_client: AsyncClient) -> None:
+    """Verify that Markdown (.md) documents are accepted, chunked, and retrievable."""
+    _, admin_hdr = await create_authenticated_user(
+        async_client, "admin.md@recall.edu", "Admin MD", "admin"
+    )
+    course_resp = await async_client.post(
+        "/api/v1/courses",
+        json={
+            "code": "CS340-MD",
+            "title": "DBMS with Markdown Knowledge Base",
+            "description": "DBMS Course testing markdown knowledge ingestion",
+        },
+        headers=admin_hdr,
+    )
+    assert course_resp.status_code == 201
+    course_id = course_resp.json()["id"]
+
+    md_content = (
+        "# Armstrong Axioms in Relational Databases\n\n"
+        "## Core Inference Rules\n"
+        "1. Reflexivity: If Y is subset of X, then X determines Y.\n"
+        "2. Augmentation: If X determines Y, then XZ determines YZ.\n"
+        "3. Transitivity: If X determines Y and Y determines Z, then X determines Z.\n\n"
+        "## Attribute Closure\n"
+        "The attribute closure X+ computes all functional consequences of X."
+    )
+
+    upload_resp = await async_client.post(
+        f"/api/v1/courses/{course_id}/documents/upload",
+        files={"file": ("lecture_notes.md", md_content.encode("utf-8"), "text/markdown")},
+        headers=admin_hdr,
+    )
+    assert upload_resp.status_code == 201
+    data = upload_resp.json()
+    assert data["status"] == "indexed"
+    assert data["filename"] == "lecture_notes.md"
+    assert data["chunk_count"] >= 1
+
+    # Verify retrieval over markdown chunks
+    retrieval_resp = await async_client.post(
+        f"/api/v1/courses/{course_id}/knowledge/retrieve",
+        json={"query": "What are Armstrong Axioms and transitivity?", "top_k": 3},
+        headers=admin_hdr,
+    )
+    assert retrieval_resp.status_code == 200
+    ret_data = retrieval_resp.json()
+    assert len(ret_data["matches"]) >= 1
+    assert "lecture_notes.md" in ret_data["matches"][0]["citation"]
+

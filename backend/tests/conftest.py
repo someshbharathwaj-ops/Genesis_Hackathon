@@ -9,8 +9,12 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
+
+# Ensure deterministic mock LLM provider is active for unit and integration tests
+settings.USE_MOCK_LLM = True
 
 # Shared in-memory SQLite engine for tests
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"

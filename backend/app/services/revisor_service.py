@@ -112,14 +112,31 @@ class RevisorService:
             for m in retrieval.matches
         ]
 
-        # 8. Assemble bounded Revisor prompt
+        # 8. Enrich topic with Curriculum DAG objective & prerequisite chain if objective_id supplied
+        effective_topic = query_or_topic
+        if objective_id:
+            from app.repositories.course_repo import LearningObjectiveRepository
+
+            lo_repo = LearningObjectiveRepository(self.session)
+            lo = await lo_repo.get_by_id(objective_id)
+            if lo:
+                prereqs = (
+                    f"Prerequisites: {', '.join(lo.prerequisite_objective_ids)}"
+                    if lo.prerequisite_objective_ids
+                    else "Foundational node (no prerequisites)"
+                )
+                effective_topic = (
+                    f"{query_or_topic}\n[Curriculum DAG Context: Objective '{lo.title}' ({lo.code}) | {prereqs}]"
+                )
+
+        # 9. Assemble bounded Revisor prompt
         prompt = RevisorEngine.assemble_prompt(
             candidate_text=candidate_text,
-            query_or_topic=query_or_topic,
+            query_or_topic=effective_topic,
             matches=matches_domain,
         )
 
-        # 9. Execute bounded SLM inference
+        # 10. Execute bounded SLM inference
         model_resp = await self.model_provider.generate_response(
             prompt=prompt.user_prompt,
             system_prompt=prompt.system_prompt,
