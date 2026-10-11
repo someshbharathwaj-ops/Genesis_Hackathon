@@ -22,9 +22,17 @@ from app.core.errors import (
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup and shutdown lifecycle manager."""
-    # Initialization of engines, connection pools, and readiness verifications
+    if "sqlite" in settings.DATABASE_URL.lower():
+        from app.core.database import Base, engine
+        from app.models.attempt import Attempt  # noqa: F401
+        from app.models.curriculum import LearningObjective, Topic  # noqa: F401
+        from app.models.document import CourseDocument, DocumentChunk  # noqa: F401
+        from app.models.identity import Course, CourseEnrollment, User  # noqa: F401
+        from app.models.question import Question, QuestionVersion  # noqa: F401
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
     yield
-    # Graceful shutdown of connection pools
 
 
 def create_application() -> FastAPI:
