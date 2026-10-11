@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import {
   AlertCircle,
+  ArrowRight,
   CheckCircle2,
   HelpCircle,
   Lock,
@@ -53,6 +54,23 @@ export function PracticeTab({
   const [submissionResult, setSubmissionResult] = useState<AttemptResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Completed questions tracking
+  const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
+  const storageKey = `recall_completed_questions_${currentUser?.id || "anon"}_${course?.id || "default"}`;
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        setCompletedQuestionIds(JSON.parse(stored));
+      } else {
+        setCompletedQuestionIds([]);
+      }
+    } catch {
+      setCompletedQuestionIds([]);
+    }
+  }, [storageKey]);
+
   // Load questions for the selected objective or first available objective
   useEffect(() => {
     async function loadQuestions() {
@@ -69,10 +87,13 @@ export function PracticeTab({
         try {
           const qs = await recallApi.listQuestionsForObjective(objToLoad.id);
           setQuestions(qs);
-          if (qs.length > 0) {
-            setSelectedQuestion(qs[0]);
-            // Pre-fill answer input hint for smooth demo
+          // Prioritize uncompleted questions
+          const uncompleted = qs.filter((q) => !completedQuestionIds.includes(q.id));
+          if (uncompleted.length > 0) {
+            setSelectedQuestion(uncompleted[0]);
             setAnswerInput("");
+          } else if (qs.length > 0) {
+            setSelectedQuestion(qs[0]);
           }
         } catch {
           setQuestions([]);
@@ -81,10 +102,12 @@ export function PracticeTab({
       setLoadingQuestions(false);
     }
     loadQuestions();
-  }, [course?.id, targetObjective?.id, topics]);
+  }, [course?.id, targetObjective?.id, topics, completedQuestionIds.length]);
 
   const handleSubmitAttempt = async () => {
     if (!currentUser || !selectedQuestion || !selectedQuestion.versions[0]) return;
+    if (completedQuestionIds.includes(selectedQuestion.id)) return; // Prevent double submit
+
     setIsSubmitting(true);
     setErrorMessage(null);
     setSubmissionResult(null);
@@ -106,15 +129,45 @@ export function PracticeTab({
       const resp = await recallApi.submitAttempt(payload, idempotencyKey);
       setSubmissionResult(resp);
 
+      // Lock question so it cannot be re-submitted and won't appear again
+      const nextCompleted = Array.from(new Set([...completedQuestionIds, selectedQuestion.id]));
+      setCompletedQuestionIds(nextCompleted);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(nextCompleted));
+      } catch {}
+
       // If user submitted an independent_checkpoint, it finishes or we can toggle lock state
       if (assessmentContext === "independent_checkpoint") {
-        // Toggle active scored assessment alert for live demonstration
         setActiveScoredAssessmentId(null);
       }
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Failed to grade attempt.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleNextQuestion = () => {
+    const uncompleted = questions.filter((q) => !completedQuestionIds.includes(q.id) && q.id !== selectedQuestion?.id);
+    if (uncompleted.length > 0) {
+      setSelectedQuestion(uncompleted[0]);
+      setAnswerInput("");
+      setSubmissionResult(null);
+      setErrorMessage(null);
+    }
+  };
+
+  const handleResetProgress = () => {
+    if (window.confirm("Reset solved question history for this course?")) {
+      setCompletedQuestionIds([]);
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {}
+      setSubmissionResult(null);
+      setAnswerInput("");
+      if (questions.length > 0) {
+        setSelectedQuestion(questions[0]);
+      }
     }
   };
 
@@ -136,6 +189,11 @@ export function PracticeTab({
   }
 
   const currentVersion = selectedQuestion?.versions[0];
+  const isCurrentQuestionCompleted =
+    !!selectedQuestion && completedQuestionIds.includes(selectedQuestion.id);
+  const uncompletedQuestions = questions.filter(
+    (q) => !completedQuestionIds.includes(q.id)
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -184,9 +242,20 @@ export function PracticeTab({
           <div className="tactile-card p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-ink-muted">Select Assessment Item:</span>
-              <span className="tactile-tag bg-surface text-ink text-[10px]">
-                {questions.length} Items Available
-              </span>
+              <div className="flex items-center gap-2">
+                {completedQuestionIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetProgress}
+                    className="text-[10px] text-ink-muted hover:text-brand-coral font-bold underline cursor-pointer"
+                  >
+                    Reset Solved
+                  </button>
+                )}
+                <span className="tactile-tag bg-surface text-ink text-[10px]">
+                  {uncompletedQuestions.length} Pending &bull; {questions.length - uncompletedQuestions.length} Solved
+                </span>
+              </div>
             </div>
 
             <select
@@ -201,11 +270,19 @@ export function PracticeTab({
               }}
               className="tactile-input text-xs font-bold cursor-pointer"
             >
-              {questions.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.title} ({q.question_type})
+              {questions.length === 0 ? (
+                <option value="">No questions found</option>
+              ) : uncompletedQuestions.length === 0 ? (
+                <option value={selectedQuestion?.id || ""}>
+                  All {questions.length} questions completed! ✓
                 </option>
-              ))}
+              ) : (
+                uncompletedQuestions.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.title} ({q.question_type})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -269,23 +346,54 @@ export function PracticeTab({
                   type="text"
                   value={answerInput}
                   onChange={(e) => setAnswerInput(e.target.value)}
-                  placeholder="e.g. A, B, C, D"
-                  className="tactile-input text-sm font-bold"
+                  placeholder={
+                    isCurrentQuestionCompleted
+                      ? "Answer submitted & evaluated. Question locked."
+                      : "e.g. A, B, C, D"
+                  }
+                  className={`tactile-input text-sm font-bold ${
+                    isCurrentQuestionCompleted ? "bg-surface opacity-80 cursor-not-allowed" : ""
+                  }`}
+                  disabled={isCurrentQuestionCompleted || isSubmitting}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSubmitAttempt();
+                    if (e.key === "Enter" && !isCurrentQuestionCompleted) handleSubmitAttempt();
                   }}
                 />
               </div>
 
-              {/* Submit Button */}
-              <button
-                onClick={handleSubmitAttempt}
-                disabled={isSubmitting || !answerInput.trim()}
-                className="tactile-btn-yellow text-sm py-2.5 w-full font-black"
-              >
-                <Send className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`} />
-                <span>{isSubmitting ? "Grading Deterministically..." : "Submit for Evaluation"}</span>
-              </button>
+              {/* Submit or Next Question Action */}
+              {isCurrentQuestionCompleted ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between p-3 bg-brand-green/15 border-2 border-brand-green rounded-friendly-sm text-xs font-bold text-ink">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-brand-green" />
+                      <span>Answer Evaluated &mdash; Submit option is locked for this question.</span>
+                    </div>
+                    <span className="tactile-tag bg-brand-green text-white text-[10px] font-black uppercase">
+                      COMPLETED
+                    </span>
+                  </div>
+                  {uncompletedQuestions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleNextQuestion}
+                      className="tactile-btn-yellow text-sm py-2.5 w-full font-black flex items-center justify-center gap-2"
+                    >
+                      <span>Proceed to Next Question</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={handleSubmitAttempt}
+                  disabled={isSubmitting || !answerInput.trim()}
+                  className="tactile-btn-yellow text-sm py-2.5 w-full font-black"
+                >
+                  <Send className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`} />
+                  <span>{isSubmitting ? "Grading Deterministically..." : "Submit for Evaluation"}</span>
+                </button>
+              )}
 
               {errorMessage && (
                 <div className="p-3 bg-brand-coral/10 border-2 border-brand-coral rounded text-xs font-bold text-brand-coral">
