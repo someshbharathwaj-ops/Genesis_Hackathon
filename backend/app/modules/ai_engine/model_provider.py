@@ -209,7 +209,14 @@ class OllamaLanguageModelProvider(BaseLanguageModelProvider):
             "stream": False,
             "options": {
                 "temperature": temperature,
-                "num_predict": max_tokens,
+                "num_predict": min(max_tokens, 450),
+                "repeat_penalty": 1.25,
+                "stop": [
+                    "OFFICIAL COURSE EXCERPTS:",
+                    "--- EXCERPT",
+                    "\nSTUDENT QUESTION:",
+                    "Copyright ©",
+                ],
             },
         }
 
