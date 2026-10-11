@@ -26,7 +26,7 @@ class DocumentExtractionResult:
 class DocumentExtractor:
     """Robust extractor extracting text page-by-page from course documents."""
 
-    SUPPORTED_EXTENSIONS = {".pdf", ".txt"}
+    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".markdown"}
 
     @classmethod
     def extract_from_bytes(
@@ -46,7 +46,10 @@ class DocumentExtractor:
 
         if ext == ".pdf" or mime_type == "application/pdf":
             return cls._extract_pdf(file_bytes, filename)
-        elif ext == ".txt" or mime_type == "text/plain":
+        elif (
+            ext in (".txt", ".md", ".markdown")
+            or mime_type in ("text/plain", "text/markdown", "application/x-markdown")
+        ):
             return cls._extract_txt(file_bytes)
         else:
             raise UnsupportedDocumentFormatError(ext or (mime_type or "unknown"))

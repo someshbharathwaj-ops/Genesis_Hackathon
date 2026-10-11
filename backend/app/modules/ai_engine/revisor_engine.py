@@ -161,22 +161,38 @@ class RevisorEngine:
         status = GroundedAuditStatus.VERIFIED_GROUNDED
         lower_raw = raw.lower()
 
-        if "insufficient_evidence" in lower_raw or "abstain" in lower_raw:
-            status = GroundedAuditStatus.INSUFFICIENT_EVIDENCE
-        elif (
-            det_contradiction
-            or "contradiction_detected" in lower_raw
-            or "contradiction" in lower_raw
-        ):
+        # Check explicit declared STATUS: line first
+        status_match = re.search(r"STATUS:\s*([A-Za-z_]+)", raw, re.IGNORECASE)
+        if status_match:
+            declared = status_match.group(1).strip().upper()
+            if "CONTRADICTION" in declared:
+                status = GroundedAuditStatus.CONTRADICTION_DETECTED
+            elif "UNGROUNDED" in declared:
+                status = GroundedAuditStatus.UNGROUNDED_CLAIM_DETECTED
+            elif "INSUFFICIENT" in declared or "ABSTAIN" in declared:
+                status = GroundedAuditStatus.INSUFFICIENT_EVIDENCE
+            elif "VERIFIED" in declared:
+                status = GroundedAuditStatus.VERIFIED_GROUNDED
+        else:
+            if "insufficient_evidence" in lower_raw or "abstain" in lower_raw:
+                status = GroundedAuditStatus.INSUFFICIENT_EVIDENCE
+            elif (
+                "contradiction_detected" in lower_raw
+                or ("contradiction" in lower_raw and "no contradiction" not in lower_raw)
+            ):
+                status = GroundedAuditStatus.CONTRADICTION_DETECTED
+            elif (
+                "ungrounded_claim_detected" in lower_raw
+                or ("ungrounded" in lower_raw and "no ungrounded" not in lower_raw)
+                or "unsupported" in lower_raw
+            ):
+                status = GroundedAuditStatus.UNGROUNDED_CLAIM_DETECTED
+            elif "verified_grounded" in lower_raw or "verified" in lower_raw:
+                status = GroundedAuditStatus.VERIFIED_GROUNDED
+
+        # Non-negotiable: Deterministic contradiction ALWAYS overrides model judgment
+        if det_contradiction:
             status = GroundedAuditStatus.CONTRADICTION_DETECTED
-        elif (
-            "ungrounded_claim_detected" in lower_raw
-            or "ungrounded" in lower_raw
-            or "unsupported" in lower_raw
-        ):
-            status = GroundedAuditStatus.UNGROUNDED_CLAIM_DETECTED
-        elif "verified_grounded" in lower_raw or "verified" in lower_raw:
-            status = GroundedAuditStatus.VERIFIED_GROUNDED
 
         # 2. Extract sections using regex
         summary = ""

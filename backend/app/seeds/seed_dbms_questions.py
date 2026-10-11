@@ -286,7 +286,10 @@ SEED_QUESTIONS_DATA: list[dict[str, Any]] = [
 ]
 
 
-async def seed_dbms_curriculum_and_questions(session: AsyncSession) -> dict[str, Any]:
+async def seed_dbms_curriculum_and_questions(
+    session: AsyncSession,
+    auto_ingest_knowledge: bool = False,
+) -> dict[str, Any]:
     """Idempotently seed the DBMS course, topic, objectives, and verified questions."""
     # 1. Instructor
     user_repo = UserRepository(session)
@@ -445,6 +448,36 @@ async def seed_dbms_curriculum_and_questions(session: AsyncSession) -> dict[str,
         await v_repo.create(version)
         seeded_count += 1
 
+    # 6. Authoritative Course Markdown Knowledge Base Ingestion (when requested)
+    if auto_ingest_knowledge:
+        try:
+            from pathlib import Path
+            from sqlalchemy import select
+            from app.models.document import CourseDocument
+            from app.services.knowledge_service import KnowledgeService
+
+            # Locate knowledge/CS340 directory relative to project root
+            knowledge_dir = Path(__file__).resolve().parents[3] / "knowledge" / "CS340"
+            if knowledge_dir.exists():
+                ks = KnowledgeService(session)
+                for md_file in knowledge_dir.glob("*.md"):
+                    stmt = select(CourseDocument).where(
+                        CourseDocument.course_id == course.id,
+                        CourseDocument.filename == md_file.name,
+                    )
+                    res = await session.execute(stmt)
+                    if not res.scalar_one_or_none():
+                        file_bytes = md_file.read_bytes()
+                        await ks.ingest_document(
+                            course_id=course.id,
+                            filename=md_file.name,
+                            file_bytes=file_bytes,
+                            mime_type="text/markdown",
+                        )
+        except Exception:
+            # Non-fatal if filesystem folder is unavailable
+            pass
+
     return {
         "status": "success",
         "course_id": course.id,
@@ -453,3 +486,4 @@ async def seed_dbms_curriculum_and_questions(session: AsyncSession) -> dict[str,
         "new_questions_seeded": seeded_count,
         "total_catalog_questions": len(SEED_QUESTIONS_DATA),
     }
+
