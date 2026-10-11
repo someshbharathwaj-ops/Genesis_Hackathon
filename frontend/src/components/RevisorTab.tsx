@@ -302,8 +302,53 @@ export function RevisorTab({
   ) => {
     setPreparingAdaptiveNext(true);
     try {
-      const isCorrect = resp.is_correct || resp.score_achieved >= (resp.max_possible_score || 1.0) * 0.7;
       const currentObj = allObjectives.find((o) => o.id === currentQuestion.objective_id);
+
+      // 1. Authoritative Backend Adaptive Decision (POST /api/v1/diagnosis/session/plan)
+      if (currentUser?.id && course?.id) {
+        try {
+          const plan = await recallApi.planDiagnosticSession(
+            currentUser.id,
+            course.id,
+            currentQuestion.objective_id
+          );
+          if (plan && plan.recommended_questions && plan.recommended_questions.length > 0) {
+            const candidate =
+              plan.recommended_questions.find(
+                (pq) => pq.question_id !== currentQuestion.id && !updatedCompleted.includes(pq.question_id)
+              ) ||
+              plan.recommended_questions.find((pq) => pq.question_id !== currentQuestion.id) ||
+              plan.recommended_questions[0];
+
+            if (candidate) {
+              const fullQ = await recallApi.getQuestion(candidate.question_id);
+              const targetObj =
+                allObjectives.find((o) => o.id === candidate.objective_id) ||
+                allObjectives.find((o) => o.code === candidate.objective_code) ||
+                currentObj ||
+                allObjectives[0];
+
+              if (fullQ) {
+                const isPrereq = candidate.priority_reason.toLowerCase().includes("prerequisite");
+                setNextAdaptiveRecommendation({
+                  type: isPrereq ? "prerequisite_reinforce" : "mastery_advance",
+                  badge: `BACKEND ADAPTIVE PROBE • ${candidate.objective_code} (${candidate.difficulty.toUpperCase()})`,
+                  badgeColor: isPrereq ? "bg-brand-coral text-white" : "bg-brand-yellow text-ink",
+                  reason: `${candidate.priority_reason}. Authoritative Rationale: ${plan.session_rationale}`,
+                  targetObjective: targetObj,
+                  question: fullQ,
+                });
+                return;
+              }
+            }
+          }
+        } catch (planErr) {
+          console.warn("Backend adaptive planner fallback to DAG:", planErr);
+        }
+      }
+
+      // 2. Client-side DAG fallback if planner unreached
+      const isCorrect = resp.is_correct || resp.score_achieved >= (resp.max_possible_score || 1.0) * 0.7;
 
       if (isCorrect) {
         // CASE 1: Student is Correct -> Advance along DAG or to next objective challenge

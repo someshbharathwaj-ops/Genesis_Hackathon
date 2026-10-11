@@ -1,13 +1,14 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import {
   BookOpen,
+  Calendar,
   CheckCircle2,
+  Clock,
   FileCheck2,
   HelpCircle,
   Layers,
   Lock,
+  Plus,
   Search,
   Shield,
   Tag,
@@ -17,6 +18,7 @@ import {
   LearningObjectiveResponse,
   QuestionResponse,
   QuestionVersionResponse,
+  ScheduledAssessmentResponse,
   TopicResponse,
 } from "../types";
 import { recallApi } from "../lib/api-client";
@@ -40,6 +42,48 @@ export function TeacherQuestionCatalog({
   const [questions, setQuestions] = useState<QuestionResponse[]>([]);
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionResponse | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Scheduled assessments state for instructor
+  const [scheduledAssessments, setScheduledAssessments] = useState<ScheduledAssessmentResponse[]>([]);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [newQuizTitle, setNewQuizTitle] = useState("");
+  const [newQuizDesc, setNewQuizDesc] = useState("");
+  const [newQuizDate, setNewQuizDate] = useState("");
+  const [newQuizDuration, setNewQuizDuration] = useState(45);
+  const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
+
+  useEffect(() => {
+    if (course?.id) {
+      recallApi.listCourseAssessments(course.id).then(setScheduledAssessments).catch(() => {});
+    }
+  }, [course?.id]);
+
+  const handleScheduleQuiz = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!course?.id || !newQuizTitle.trim()) return;
+    setIsSubmittingSchedule(true);
+    try {
+      const scheduledAtIso = newQuizDate
+        ? new Date(newQuizDate).toISOString()
+        : new Date(Date.now() + 86400000).toISOString();
+      const created = await recallApi.scheduleAssessment(course.id, {
+        title: newQuizTitle.trim(),
+        description: newQuizDesc.trim(),
+        scheduled_at: scheduledAtIso,
+        duration_minutes: Number(newQuizDuration) || 45,
+        target_objective_id: selectedObjectiveId || null,
+      });
+      setScheduledAssessments((prev) => [...prev, created]);
+      setNewQuizTitle("");
+      setNewQuizDesc("");
+      setShowScheduleForm(false);
+      alert(`Quiz successfully scheduled! Enrolled students have been notified via in-app alert.`);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to schedule assessment");
+    } finally {
+      setIsSubmittingSchedule(false);
+    }
+  };
 
   // Initialize selected topic and objective
   useEffect(() => {
@@ -101,11 +145,131 @@ export function TeacherQuestionCatalog({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowScheduleForm(!showScheduleForm)}
+            className="tactile-btn-yellow text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>{showScheduleForm ? "Close Scheduler" : "+ Schedule Course Quiz"}</span>
+          </button>
           <span className="tactile-tag bg-brand-green/20 text-ink text-xs font-bold">
-            {questions.length} Verified in Current Objective
+            {questions.length} Verified Qs
           </span>
         </div>
       </div>
+
+      {/* Teacher Quiz Scheduler Form Panel */}
+      {showScheduleForm && (
+        <form
+          onSubmit={handleScheduleQuiz}
+          className="tactile-card p-5 bg-white border-2 border-ink shadow-hard flex flex-col gap-4"
+        >
+          <div className="border-b border-ink/10 pb-2">
+            <h3 className="text-sm font-black text-ink flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-brand-coral" />
+              <span>Schedule New Quiz / Assessment &bull; Auto-Alerts Enrolled Cohort</span>
+            </h3>
+            <p className="text-[11px] text-ink-muted mt-0.5">
+              Scheduled quizzes are persisted in the course calendar and immediately trigger in-app notifications for enrolled students.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-ink">Quiz / Exam Title *</label>
+              <input
+                type="text"
+                required
+                value={newQuizTitle}
+                onChange={(e) => setNewQuizTitle(e.target.value)}
+                placeholder="e.g. Midterm Test: Normalization & Keys"
+                className="tactile-input text-xs"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-ink">Scheduled Date &amp; Time *</label>
+              <input
+                type="datetime-local"
+                value={newQuizDate}
+                onChange={(e) => setNewQuizDate(e.target.value)}
+                className="tactile-input text-xs"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-ink">Duration (Minutes)</label>
+              <input
+                type="number"
+                min="5"
+                max="180"
+                value={newQuizDuration}
+                onChange={(e) => setNewQuizDuration(Number(e.target.value))}
+                className="tactile-input text-xs"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-ink">Description / Scope Notes</label>
+              <input
+                type="text"
+                value={newQuizDesc}
+                onChange={(e) => setNewQuizDesc(e.target.value)}
+                placeholder="e.g. Covers 1NF through BCNF and attribute closures."
+                className="tactile-input text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-ink/10">
+            <button
+              type="button"
+              onClick={() => setShowScheduleForm(false)}
+              className="tactile-btn-white text-xs py-1.5 px-3 font-bold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmittingSchedule || !newQuizTitle.trim()}
+              className="tactile-btn-coral text-xs py-1.5 px-4 font-black"
+            >
+              {isSubmittingSchedule ? "Scheduling & Alerting..." : "Publish Assessment & Alert Cohort"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Existing Scheduled Assessments List */}
+      {scheduledAssessments.length > 0 && (
+        <div className="tactile-card p-4 bg-surface-warm/40 border-2 border-ink flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-ink uppercase tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-brand-coral" />
+              <span>Published Course Assessments ({scheduledAssessments.length})</span>
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {scheduledAssessments.map((a) => (
+              <div
+                key={a.id}
+                className="p-3 bg-white border border-ink rounded text-xs flex flex-col gap-1 shadow-hard-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-ink">{a.title}</span>
+                  <span className="tactile-tag bg-brand-coral text-white text-[9px] uppercase font-bold">
+                    {a.duration_minutes}m &bull; {a.status}
+                  </span>
+                </div>
+                <div className="text-[11px] text-ink-muted">
+                  {new Date(a.scheduled_at).toLocaleString()}
+                </div>
+                {a.description && <div className="text-[11px] text-ink-muted">{a.description}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Selectors Bar */}
       <div className="tactile-card p-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-surface">

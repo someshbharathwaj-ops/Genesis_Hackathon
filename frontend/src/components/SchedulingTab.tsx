@@ -16,6 +16,7 @@ import {
   CourseResponse,
   RetentionSessionPlanResponse,
   ReviewQueueResponse,
+  ScheduledAssessmentResponse,
   UserResponse,
 } from "../types";
 import { recallApi } from "../lib/api-client";
@@ -32,6 +33,7 @@ export function SchedulingTab({
   onStartRetentionSession,
 }: SchedulingTabProps) {
   const [queue, setQueue] = useState<ReviewQueueResponse | null>(null);
+  const [courseAssessments, setCourseAssessments] = useState<ScheduledAssessmentResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,8 +46,12 @@ export function SchedulingTab({
     setLoading(true);
     setError(null);
     try {
-      const q = await recallApi.getReviewQueue(course.id, currentUser.id);
+      const [q, assessments] = await Promise.all([
+        recallApi.getReviewQueue(course.id, currentUser.id).catch(() => null),
+        recallApi.listCourseAssessments(course.id).catch(() => []),
+      ]);
       setQueue(q);
+      setCourseAssessments(assessments || []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load review queue.");
     } finally {
@@ -112,6 +118,78 @@ export function SchedulingTab({
           <Sparkles className={`w-3.5 h-3.5 ${isPlanning ? "animate-spin" : ""}`} />
           <span>{isPlanning ? "Planning..." : "Plan Spaced Session (≤ 5 Qs)"}</span>
         </button>
+      </section>
+
+      {/* Persisted Course Assessment Calendar (Quizzes & Tests) */}
+      <section className="tactile-card p-6 bg-surface flex flex-col gap-4 border-2 border-ink shadow-hard">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-ink/10 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="tactile-tag bg-brand-coral text-white text-[10px] font-black uppercase">
+                EXAM &amp; QUIZ CALENDAR
+              </span>
+              <span className="text-xs font-bold text-ink-muted">
+                Course: {course?.code || "CS340"}
+              </span>
+            </div>
+            <h3 className="text-lg font-black text-ink mt-0.5">
+              Teacher-Scheduled Quizzes &amp; Assessments
+            </h3>
+          </div>
+          <span className="text-xs font-bold text-ink-muted">
+            {courseAssessments.length} Scheduled Assessment{courseAssessments.length === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {courseAssessments.length === 0 ? (
+          <div className="p-6 text-center text-ink-muted bg-surface-warm/40 border border-ink/10 rounded-friendly-sm">
+            <Clock className="w-6 h-6 mx-auto mb-1 text-ink-faint" />
+            <p className="text-xs font-bold">No upcoming quizzes scheduled yet by your instructor.</p>
+            <p className="text-[11px] font-medium text-ink-muted mt-0.5">
+              When instructors post an exam or test, it automatically appears here and alerts your notification center.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {courseAssessments.map((a) => (
+              <div
+                key={a.id}
+                className="p-4 bg-white border-2 border-ink rounded-friendly-sm shadow-hard-sm flex flex-col justify-between gap-3"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="tactile-tag bg-brand-coral text-white text-[10px] uppercase font-black">
+                      {a.status}
+                    </span>
+                    <span className="text-xs font-bold text-ink-muted flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-brand-coral" />
+                      <span>{a.duration_minutes} Minutes</span>
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-black text-ink leading-snug">{a.title}</h4>
+                  {a.description && (
+                    <p className="text-xs text-ink-muted mt-1 leading-relaxed">{a.description}</p>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-ink/10 flex items-center justify-between gap-2">
+                  <div className="text-[11px] font-bold text-ink">
+                    <span className="text-ink-muted block text-[10px]">SCHEDULED TIME</span>
+                    {new Date(a.scheduled_at).toLocaleString()}
+                  </div>
+                  {onStartRetentionSession && (
+                    <button
+                      onClick={() => handlePlanRetentionSession()}
+                      className="tactile-btn-yellow text-xs py-1 px-2.5 font-black shrink-0"
+                    >
+                      Prepare Now
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Queue Stat Cards */}

@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     scheduling,
     tutor,
     users,
+    assessments,
 )
 
 api_v1_router = APIRouter()
@@ -40,3 +41,4 @@ api_v1_router.include_router(documents.router)
 api_v1_router.include_router(tutor.router)
 api_v1_router.include_router(revisor.router)
 api_v1_router.include_router(scheduling.router)
+api_v1_router.include_router(assessments.router)
