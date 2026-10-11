@@ -97,8 +97,8 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> To
 
     # Ensure enrollment if student
     if user.role == UserRole.STUDENT:
-        course = await course_repo.get_by_code("CS340")
-        if course:
+        all_courses = await course_repo.list_all()
+        for course in all_courses:
             existing = await enroll_repo.get_enrollment(user.id, course.id)
             if not existing:
                 enrollment = CourseEnrollment(user_id=user.id, course_id=course.id, is_active=True)
@@ -175,12 +175,14 @@ async def demo_login(
         user = User(email=email, full_name=full_name, role=role, is_active=True)
         user = await user_repo.create(user)
 
-    # 3. Ensure student enrollment in course
-    if course and user.role == UserRole.STUDENT:
-        existing_enrollment = await enroll_repo.get_enrollment(user.id, course.id)
-        if not existing_enrollment:
-            enrollment = CourseEnrollment(user_id=user.id, course_id=course.id, is_active=True)
-            await enroll_repo.create(enrollment)
+    # 3. Ensure student enrollment in all courses
+    if user.role == UserRole.STUDENT:
+        all_courses = await course_repo.list_all()
+        for c in all_courses:
+            existing_enrollment = await enroll_repo.get_enrollment(user.id, c.id)
+            if not existing_enrollment:
+                enrollment = CourseEnrollment(user_id=user.id, course_id=c.id, is_active=True)
+                await enroll_repo.create(enrollment)
 
     token = create_access_token(
         user_id=user.id,
