@@ -108,6 +108,7 @@ export function Navbar({
           {currentUser ? (
             <div className="relative">
               <button
+                id="btn-user-profile"
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="tactile-btn-yellow text-xs py-1.5 px-3"
               >
@@ -116,6 +117,16 @@ export function Navbar({
                 <span className="tactile-tag bg-surface text-ink text-[9px] py-0 px-1 ml-1 uppercase">
                   {currentUser.role}
                 </span>
+              </button>
+
+              <button
+                id="btn-nav-logout"
+                onClick={onLogout}
+                title="Sign out of current session"
+                className="tactile-btn-white text-xs py-1.5 px-2.5 font-bold hover:!bg-brand-coral hover:!text-white"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sign Out</span>
               </button>
 
               {showUserMenu && (
