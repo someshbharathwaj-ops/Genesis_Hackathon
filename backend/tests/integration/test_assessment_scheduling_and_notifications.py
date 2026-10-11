@@ -96,3 +96,20 @@ async def test_assessment_scheduling_and_student_notifications(async_client: Asy
         headers=student_b_hdr,
     )
     assert forbidden_resp.status_code == 403
+
+    # 9. Student self-scheduling test: Alice schedules a practice quiz for herself
+    student_sched_payload = {
+        "title": "Self-Scheduled Normalization Practice Quiz",
+        "description": "Personal practice covering 2NF and 3NF decompositions.",
+        "scheduled_at": datetime(2026, 10, 18, 14, 0, tzinfo=timezone.utc).isoformat(),
+        "duration_minutes": 30,
+    }
+    alice_sched_resp = await async_client.post(
+        f"/api/v1/courses/{course_id}/assessments",
+        json=student_sched_payload,
+        headers=student_a_hdr,
+    )
+    assert alice_sched_resp.status_code == 201
+    alice_sched = alice_sched_resp.json()
+    assert alice_sched["title"] == student_sched_payload["title"]
+    assert alice_sched["duration_minutes"] == 30

@@ -37,6 +37,10 @@ class Settings(BaseSettings):
         default=["http://localhost:3000", "http://127.0.0.1:3000"],
         description="CORS allowed origins",
     )
+    ALLOWED_ORIGIN_REGEX: str | None = Field(
+        default=None,
+        description="Optional regex pattern for allowed origins",
+    )
 
     # LLM / Primary Model Adapter
     OLLAMA_BASE_URL: str = Field(

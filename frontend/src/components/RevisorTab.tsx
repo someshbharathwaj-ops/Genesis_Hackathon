@@ -76,6 +76,8 @@ interface RevisorTabProps {
   hasActiveScoredAssessment: boolean;
   onToggleLockout?: () => void;
   targetObjective?: LearningObjectiveResponse | null;
+  preparationNotice?: string | null;
+  onClearPreparationNotice?: () => void;
 }
 
 export function RevisorTab({
@@ -85,6 +87,8 @@ export function RevisorTab({
   hasActiveScoredAssessment,
   onToggleLockout,
   targetObjective,
+  preparationNotice,
+  onClearPreparationNotice,
 }: RevisorTabProps) {
   const [subView, setSubView] = useState<"practice" | "audit" | "schedule">("practice");
 
@@ -649,6 +653,37 @@ export function RevisorTab({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Test Workbench Notice if redirected from Tutor Preparation */}
+      {preparationNotice && (
+        <div className="tactile-card border-brand-green bg-brand-green/15 p-4 flex items-center justify-between gap-3 animate-fade-in shadow-hard-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-friendly-sm bg-brand-green text-ink border-2 border-ink flex items-center justify-center shrink-0 font-black">
+              ✍️
+            </div>
+            <div>
+              <div className="font-black text-xs uppercase tracking-wider text-ink flex items-center gap-2">
+                <span>Test Workbench Active</span>
+                <span className="tactile-tag bg-brand-green text-ink text-[9px] uppercase font-bold">
+                  Ready to Write
+                </span>
+              </div>
+              <p className="text-xs text-ink-muted font-medium mt-0.5">
+                {preparationNotice}
+              </p>
+            </div>
+          </div>
+          {onClearPreparationNotice && (
+            <button
+              type="button"
+              onClick={onClearPreparationNotice}
+              className="tactile-btn-white text-[11px] py-1 px-2.5 font-bold shrink-0"
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Mode Sub-Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b-2 border-ink/10">
         <div className="flex items-center gap-2">

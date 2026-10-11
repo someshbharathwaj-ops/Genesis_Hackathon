@@ -26,7 +26,7 @@ router = APIRouter(tags=["Assessment Scheduling & Notifications"])
     "/courses/{course_id}/assessments",
     response_model=ScheduledAssessmentResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Schedule an Assessment (Instructor)",
+    summary="Schedule an Assessment or Practice Quiz",
 )
 async def schedule_assessment(
     course_id: str,
@@ -34,7 +34,6 @@ async def schedule_assessment(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> ScheduledAssessmentResponse:
-    require_instructor_or_admin(current_user)
     await verify_course_access(course_id, current_user, session)
 
     assessment = ScheduledAssessment(
@@ -50,18 +49,22 @@ async def schedule_assessment(
     session.add(assessment)
     await session.flush()
 
-    # Query enrolled active students for this course
-    enrolled_stmt = (
-        select(CourseEnrollment.user_id)
-        .join(User, CourseEnrollment.user_id == User.id)
-        .where(
-            CourseEnrollment.course_id == course_id,
-            CourseEnrollment.is_active.is_(True),
-            User.role == "student",
+    if current_user.role in ("instructor", "admin"):
+        # Query enrolled active students for this course
+        enrolled_stmt = (
+            select(CourseEnrollment.user_id)
+            .join(User, CourseEnrollment.user_id == User.id)
+            .where(
+                CourseEnrollment.course_id == course_id,
+                CourseEnrollment.is_active.is_(True),
+                User.role == "student",
+            )
         )
-    )
-    enrolled_result = await session.execute(enrolled_stmt)
-    student_ids = [row[0] for row in enrolled_result.all()]
+        enrolled_result = await session.execute(enrolled_stmt)
+        student_ids = [row[0] for row in enrolled_result.all()]
+    else:
+        # Self-scheduled assessment for this student
+        student_ids = [current_user.id]
 
     formatted_time = payload.scheduled_at.strftime("%b %d, %Y at %H:%M UTC")
     for s_id in student_ids:

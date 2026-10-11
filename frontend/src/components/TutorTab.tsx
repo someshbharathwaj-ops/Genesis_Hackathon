@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRight,
   BookOpen,
   CheckCircle2,
   Lock,
@@ -11,7 +12,7 @@ import {
   ShieldAlert,
   Sparkles,
 } from "lucide-react";
-import { CourseResponse, TutorQueryResponse, UserResponse } from "../types";
+import { AttemptResponse, CourseResponse, TutorQueryResponse, UserResponse } from "../types";
 import { ApiError, recallApi } from "../lib/api-client";
 import { StructuredExplanation } from "./StructuredExplanation";
 
@@ -19,12 +20,20 @@ interface TutorTabProps {
   course: CourseResponse | null;
   currentUser: UserResponse | null;
   hasActiveScoredAssessment: boolean;
+  initialQuery?: string | null;
+  initialAssessmentTitle?: string | null;
+  onClearInitialQuery?: () => void;
+  onProceedToTest?: (attemptCount: number) => void;
 }
 
 export function TutorTab({
   course,
   currentUser,
   hasActiveScoredAssessment,
+  initialQuery,
+  initialAssessmentTitle,
+  onClearInitialQuery,
+  onProceedToTest,
 }: TutorTabProps) {
   const isOS =
     course?.code.toUpperCase() === "CS301" ||
@@ -46,18 +55,66 @@ export function TutorTab({
     ? "What is the difference between TCP and UDP flow control?"
     : "What is minimal cover and why is it useful?";
 
-  const [query, setQuery] = useState<string>(sample1);
+  const [query, setQuery] = useState<string>(initialQuery || sample1);
   const [isAsking, setIsAsking] = useState<boolean>(false);
   const [response, setResponse] = useState<TutorQueryResponse | null>(null);
   const [lockoutError, setLockoutError] = useState<string | null>(null);
   const [generalError, setGeneralError] = useState<string | null>(null);
 
+  // Attempt tracking and redirect state
+  const [studentAttempts, setStudentAttempts] = useState<AttemptResponse[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [countdownActive, setCountdownActive] = useState<boolean>(false);
+
   useEffect(() => {
-    setQuery(sample1);
+    if (currentUser?.id) {
+      recallApi
+        .listStudentAttempts(currentUser.id)
+        .then(setStudentAttempts)
+        .catch(() => setStudentAttempts([]));
+    }
+  }, [currentUser?.id, course?.id]);
+
+  useEffect(() => {
+    if (!countdownActive || countdown === null) return;
+    if (countdown <= 0) {
+      setCountdownActive(false);
+      if (onProceedToTest) {
+        onProceedToTest(studentAttempts.length);
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdownActive, countdown, studentAttempts.length, onProceedToTest]);
+
+  const handleProceedNow = () => {
+    setCountdownActive(false);
+    setCountdown(null);
+    if (onProceedToTest) {
+      onProceedToTest(studentAttempts.length);
+    }
+  };
+
+  const handleCancelCountdown = () => {
+    setCountdownActive(false);
+    setCountdown(null);
+  };
+
+  useEffect(() => {
+    if (initialQuery) {
+      setQuery(initialQuery);
+    } else {
+      setQuery(sample1);
+    }
     setResponse(null);
     setGeneralError(null);
     setLockoutError(null);
-  }, [course?.id, sample1]);
+  }, [course?.id, sample1, initialQuery]);
 
   const handleAskTutor = async () => {
     if (!course || !currentUser || !query.trim()) return;
@@ -80,6 +137,10 @@ export function TutorTab({
     try {
       const resp = await recallApi.askTutor(course.id, currentUser.id, query);
       setResponse(resp);
+      if (initialAssessmentTitle && onProceedToTest) {
+        setCountdown(6);
+        setCountdownActive(true);
+      }
     } catch (err: unknown) {
       if (err instanceof ApiError && err.problem.code === "ASSESSMENT_LOCKOUT") {
         setLockoutError(err.problem.detail);
@@ -93,6 +154,10 @@ export function TutorTab({
           await recallApi.enrollUser(currentUser.id, course.id);
           const retryResp = await recallApi.askTutor(course.id, currentUser.id, query);
           setResponse(retryResp);
+          if (initialAssessmentTitle && onProceedToTest) {
+            setCountdown(6);
+            setCountdownActive(true);
+          }
           return;
         } catch (retryErr: unknown) {
           if (retryErr instanceof ApiError) {
@@ -180,6 +245,48 @@ export function TutorTab({
             <p className="text-xs text-ink font-medium leading-relaxed">
               {generalError}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Exam Preparation Mode Alert (if launched via Prepare Now) */}
+      {initialAssessmentTitle && (
+        <div className="tactile-card border-brand-yellow bg-brand-yellow/15 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in shadow-hard-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-friendly-sm bg-brand-yellow text-ink border-2 border-ink flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-black text-sm text-ink flex items-center gap-2">
+                <span>Exam Preparation Mode:</span>
+                <span className="underline decoration-brand-yellow decoration-2">{initialAssessmentTitle}</span>
+              </div>
+              <p className="text-xs text-ink-muted font-medium mt-0.5">
+                The tutor inquiry below is pre-formulated with key objectives to help you prepare for this scheduled test.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {countdownActive && countdown !== null && (
+              <div className="flex items-center gap-2 bg-brand-yellow border-2 border-ink py-1 px-2.5 rounded-friendly-sm text-xs font-black text-ink shadow-hard-sm animate-pulse">
+                <span>Redirecting in {countdown}s...</span>
+                <button
+                  type="button"
+                  onClick={handleCancelCountdown}
+                  className="text-[10px] underline hover:text-ink/70"
+                >
+                  Stay
+                </button>
+              </div>
+            )}
+            {onClearInitialQuery && (
+              <button
+                onClick={onClearInitialQuery}
+                className="tactile-btn-white text-xs py-1 px-3 font-bold shrink-0"
+              >
+                Reset to General
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -321,6 +428,46 @@ export function TutorTab({
                     Tokens: {response.prompt_tokens} in / {response.completion_tokens} out
                   </span>
                 )}
+              </div>
+
+              {/* Post-Preparation Next Step Card: Attempt-Based Redirection */}
+              <div className="mt-2 p-5 bg-surface-warm/40 border-2 border-ink rounded-friendly-sm shadow-hard-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-friendly-sm bg-brand-yellow text-ink border-2 border-ink flex items-center justify-center shrink-0 font-black text-sm">
+                    #{studentAttempts.length === 0 ? "1" : studentAttempts.length + 1}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="tactile-tag bg-brand-green text-ink text-[10px] font-black uppercase">
+                        {studentAttempts.length === 0 ? "First Attempt Track" : `Retest Track • Attempt #${studentAttempts.length + 1}`}
+                      </span>
+                      <span className="text-xs font-bold text-ink">
+                        {studentAttempts.length === 0 ? "Initial Test Ready" : "Diagnostic Mastery & Retest"}
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-black text-ink mt-1">
+                      {studentAttempts.length === 0
+                        ? "Preparation Ready: Proceed to Write Test"
+                        : "Preparation Ready: Review Diagnosis & Write Retest"}
+                    </h4>
+                    <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">
+                      {studentAttempts.length === 0
+                        ? "Your conceptual grounding is complete. Step directly into the test workbench to write and submit your answers."
+                        : `Based on your previous ${studentAttempts.length} attempt(s), review your updated diagnostic profile, then write your retest.`}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleProceedNow}
+                  className="tactile-btn-yellow text-xs py-2.5 px-4 font-black flex items-center justify-center gap-2 w-full md:w-auto shrink-0 shadow-hard hover:scale-[1.02] transition-transform"
+                >
+                  <span>
+                    {studentAttempts.length === 0 ? "Write Test Now (Practice Workbench)" : "View Diagnosis & Write Retest"}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           ) : (
