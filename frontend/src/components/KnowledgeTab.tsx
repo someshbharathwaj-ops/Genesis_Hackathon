@@ -58,19 +58,26 @@ export function KnowledgeTab({ course }: KnowledgeTabProps) {
     fetchDocuments();
   }, [course?.id]);
 
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !course) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0 || !course) return;
 
     setIsUploading(true);
     setUploadError(null);
     try {
-      await recallApi.uploadDocument(course.id, file);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress(`Ingesting ${i + 1}/${files.length}: ${file.name}...`);
+        await recallApi.uploadDocument(course.id, file);
+      }
       await fetchDocuments();
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : "Document upload failed");
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
       e.target.value = "";
     }
   };
@@ -137,7 +144,7 @@ export function KnowledgeTab({ course }: KnowledgeTabProps) {
           </div>
           <h2 className="text-2xl font-black text-ink">Course Learning Materials</h2>
           <p className="text-sm text-ink-muted mt-1 max-w-2xl font-medium">
-            Ingest authoritative course lecture slides and reading materials (.PDF / .TXT) with repeat-safe
+            Ingest authoritative course lecture slides, notes, and readings (.PDF, .MD, .DOCX, .PPTX) with repeat-safe
             content hashing and slide-level chunk metadata.
           </p>
         </div>
@@ -146,10 +153,11 @@ export function KnowledgeTab({ course }: KnowledgeTabProps) {
         <div>
           <label className={`tactile-btn-yellow text-xs py-2 px-4 cursor-pointer ${isUploading ? "opacity-50" : ""}`}>
             <FileUp className={`w-4 h-4 ${isUploading ? "animate-bounce" : ""}`} />
-            <span>{isUploading ? "Ingesting & Chunking..." : "Upload Material (PDF/TXT)"}</span>
+            <span>{isUploading ? (uploadProgress || "Ingesting & Chunking...") : "Upload Materials (PDF, MD, DOCX, PPTX)"}</span>
             <input
               type="file"
-              accept=".pdf,.txt"
+              multiple
+              accept=".pdf,.txt,.md,.markdown,.docx,.pptx"
               onChange={handleFileUpload}
               disabled={isUploading}
               className="hidden"
