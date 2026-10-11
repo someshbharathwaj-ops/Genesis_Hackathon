@@ -94,7 +94,7 @@ export function CurriculumTab({
 
           {topics.length === 0 ? (
             <div className="tactile-card p-6 text-center text-ink-muted text-sm">
-              No topics found. Click &quot;Seed DBMS&quot; in the header to load CS340 curriculum.
+              No topics found for {course?.code || "this course"}. Click &quot;Seed {course?.code || "Course"}&quot; in the header to initialize curriculum.
             </div>
           ) : (
             topics.map((topic) => {

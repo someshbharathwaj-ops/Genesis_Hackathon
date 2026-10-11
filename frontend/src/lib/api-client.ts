@@ -130,8 +130,21 @@ export const recallApi = {
   listCourses: () => fetchApi<CourseResponse[]>("/courses"),
   getCourse: (courseId: string) => fetchApi<CourseResponse>(`/courses/${courseId}`),
   getCourseTopics: (courseId: string) => fetchApi<TopicResponse[]>(`/courses/${courseId}/topics`),
+  seedCourse: (courseCode: string) =>
+    fetchApi<Record<string, unknown>>(`/courses/seed/${encodeURIComponent(courseCode)}`, {
+      method: "POST",
+    }),
+  seedNewCourse: (payload: { code: string; title?: string; description?: string }) =>
+    fetchApi<Record<string, unknown>>("/courses/seed", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   seedDbmsCourse: () =>
     fetchApi<Record<string, unknown>>("/courses/seed/dbms", {
+      method: "POST",
+    }),
+  seedOsCourse: () =>
+    fetchApi<Record<string, unknown>>("/courses/seed/os", {
       method: "POST",
     }),
 
