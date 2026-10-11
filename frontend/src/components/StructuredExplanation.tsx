@@ -2,6 +2,7 @@
 
 import React from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   GraduationCap,
   Lightbulb,
@@ -19,7 +20,7 @@ interface StructuredPoint {
 
 interface ParsedSection {
   title: string;
-  type: "concept" | "rules" | "example" | "takeaway" | "general";
+  type: "concept" | "rules" | "example" | "misconception" | "takeaway" | "general";
   points: StructuredPoint[];
 }
 
@@ -164,9 +165,10 @@ export function StructuredExplanation({ content }: StructuredExplanationProps) {
 
       const lower = title.toLowerCase();
       let type: ParsedSection["type"] = "general";
-      if (lower.includes("concept") || lower.includes("glance")) type = "concept";
+      if (lower.includes("direct") || lower.includes("concept") || lower.includes("glance")) type = "concept";
       else if (lower.includes("rule") || lower.includes("breakdown") || lower.includes("step")) type = "rules";
       else if (lower.includes("example") || lower.includes("worked")) type = "example";
+      else if (lower.includes("misconception") || lower.includes("mistake") || lower.includes("fallacy")) type = "misconception";
       else if (lower.includes("takeaway") || lower.includes("summary")) type = "takeaway";
 
       const points = extractBulletPoints(body || title);
@@ -300,6 +302,30 @@ export function StructuredExplanation({ content }: StructuredExplanationProps) {
                       <span className="w-1.5 h-1.5 rounded-full bg-brand-yellow mt-1.5 shrink-0" />
                       <div>
                         {pt.prefix && <strong className="font-black text-ink mr-1">{pt.prefix}:</strong>}
+                        <span>{formatInlineText(pt.body)}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+
+          case "misconception":
+            return (
+              <div
+                key={sIdx}
+                className="p-3.5 bg-brand-coral/10 border-2 border-brand-coral/50 rounded-friendly-sm flex flex-col gap-2"
+              >
+                <div className="flex items-center gap-1.5 text-[11px] font-black text-brand-coral uppercase tracking-wider">
+                  <AlertTriangle className="w-3.5 h-3.5 text-brand-coral shrink-0" />
+                  <span>{sec.title}</span>
+                </div>
+                <ul className="flex flex-col gap-1.5 pl-1">
+                  {sec.points.map((pt, pIdx) => (
+                    <li key={pIdx} className="flex items-start gap-2 text-ink font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-coral mt-1.5 shrink-0" />
+                      <div>
+                        {pt.prefix && <strong className="font-black text-brand-coral mr-1">{pt.prefix}:</strong>}
                         <span>{formatInlineText(pt.body)}</span>
                       </div>
                     </li>

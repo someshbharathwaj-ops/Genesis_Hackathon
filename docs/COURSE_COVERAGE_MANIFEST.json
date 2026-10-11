@@ -1,0 +1,597 @@
+{
+  "courses": {
+    "CS340": {
+      "course_id": "1651bee3-3875-4014-b335-dd38caea2622",
+      "title": "Database Management Systems",
+      "topics_count": 4,
+      "objectives_count": 14,
+      "questions_count": 24,
+      "difficulty_distribution": {
+        "introductory": 6,
+        "intermediate": 15,
+        "advanced": 3
+      },
+      "dag_validation": {
+        "course_code": "CS340",
+        "total_nodes": 14,
+        "is_acyclic": true,
+        "cycle_count": 0,
+        "roots_count": 4,
+        "roots": [
+          "LO_RA_SELECT_PROJECT",
+          "LO_SQL_SUBQUERIES",
+          "LO_TX_ACID",
+          "LO_CLOSURE"
+        ],
+        "topological_order_codes": [
+          "LO_RA_SELECT_PROJECT",
+          "LO_SQL_SUBQUERIES",
+          "LO_TX_ACID",
+          "LO_CLOSURE",
+          "LO_RA_JOINS",
+          "LO_SQL_GROUPING",
+          "LO_TX_SERIALIZABILITY",
+          "LO_KEYS",
+          "LO_MINIMAL_COVER",
+          "LO_RA_AGGREGATION",
+          "LO_SQL_CONSTRAINTS",
+          "LO_TX_LOCKING",
+          "LO_NF_IDENTIFICATION",
+          "LO_DECOMPOSITION"
+        ]
+      },
+      "knowledge_files": [
+        {
+          "filename": "dbms_functional_dependencies.md",
+          "size_bytes": 3547,
+          "has_worked_examples": true,
+          "has_misconceptions": false
+        },
+        {
+          "filename": "dbms_normalization_and_decomposition.md",
+          "size_bytes": 3489,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        },
+        {
+          "filename": "dbms_relational_algebra.md",
+          "size_bytes": 3747,
+          "has_worked_examples": true,
+          "has_misconceptions": true
+        },
+        {
+          "filename": "dbms_sql_queries_and_constraints.md",
+          "size_bytes": 3764,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        },
+        {
+          "filename": "dbms_transactions_concurrency.md",
+          "size_bytes": 3769,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        }
+      ],
+      "knowledge_files_count": 5,
+      "topics": [
+        {
+          "code": "FD_NORM",
+          "title": "Functional Dependencies & Normalization",
+          "objectives_count": 5,
+          "objectives": [
+            {
+              "code": "LO_CLOSURE",
+              "title": "Attribute Closure",
+              "question_count": 3,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_KEYS",
+              "title": "Candidate Keys",
+              "question_count": 3,
+              "prerequisites": [
+                "LO_CLOSURE"
+              ]
+            },
+            {
+              "code": "LO_MINIMAL_COVER",
+              "title": "Minimal Cover",
+              "question_count": 3,
+              "prerequisites": [
+                "LO_CLOSURE"
+              ]
+            },
+            {
+              "code": "LO_NF_IDENTIFICATION",
+              "title": "Normal Form Verification",
+              "question_count": 3,
+              "prerequisites": [
+                "LO_KEYS"
+              ]
+            },
+            {
+              "code": "LO_DECOMPOSITION",
+              "title": "Decomposition",
+              "question_count": 3,
+              "prerequisites": [
+                "LO_NF_IDENTIFICATION"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "REL_ALGEBRA",
+          "title": "Relational Model & Relational Algebra",
+          "objectives_count": 3,
+          "objectives": [
+            {
+              "code": "LO_RA_SELECT_PROJECT",
+              "title": "Selection & Projection Operations",
+              "question_count": 1,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_RA_JOINS",
+              "title": "Relational Joins & Cartesian Products",
+              "question_count": 1,
+              "prerequisites": [
+                "3a6470f2-dc38-43eb-952b-f6b3d131f5d9"
+              ]
+            },
+            {
+              "code": "LO_RA_AGGREGATION",
+              "title": "Grouping & Aggregate Calculus",
+              "question_count": 1,
+              "prerequisites": [
+                "4bdac83d-d3a8-4e69-8984-ea7d67c3de84"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "SQL_LANG",
+          "title": "SQL Query Formulation & Integrity",
+          "objectives_count": 3,
+          "objectives": [
+            {
+              "code": "LO_SQL_SUBQUERIES",
+              "title": "Correlated Subqueries & Predicates",
+              "question_count": 1,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_SQL_GROUPING",
+              "title": "Grouping & Aggregate Pipelines",
+              "question_count": 1,
+              "prerequisites": [
+                "40e58290-1f80-450e-a599-f9d60430c6be"
+              ]
+            },
+            {
+              "code": "LO_SQL_CONSTRAINTS",
+              "title": "Referential Integrity & Constraints",
+              "question_count": 1,
+              "prerequisites": [
+                "3a04ff32-13b6-4dd4-9023-d213f081b99d"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "TX_CONCURRENCY",
+          "title": "Transactions & Concurrency Control",
+          "objectives_count": 3,
+          "objectives": [
+            {
+              "code": "LO_TX_ACID",
+              "title": "ACID Properties & Transaction States",
+              "question_count": 1,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_TX_SERIALIZABILITY",
+              "title": "Conflict Serializability & Graphs",
+              "question_count": 1,
+              "prerequisites": [
+                "274cc1b2-6fa0-4d4c-9574-a76f78d6eb40"
+              ]
+            },
+            {
+              "code": "LO_TX_LOCKING",
+              "title": "Two-Phase Locking (2PL)",
+              "question_count": 1,
+              "prerequisites": [
+                "30b19897-9d77-4422-bfc7-031a5c6ba47a"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "CS301": {
+      "course_id": "582c2678-1f15-482f-bf49-49dd2e711584",
+      "title": "Operating Systems & Concurrency",
+      "topics_count": 5,
+      "objectives_count": 16,
+      "questions_count": 21,
+      "difficulty_distribution": {
+        "introductory": 9,
+        "intermediate": 10,
+        "advanced": 2
+      },
+      "dag_validation": {
+        "course_code": "CS301",
+        "total_nodes": 16,
+        "is_acyclic": true,
+        "cycle_count": 0,
+        "roots_count": 5,
+        "roots": [
+          "LO_OS_DEADLOCKS",
+          "LO_OS_PAGING",
+          "LO_OS_PROCESS",
+          "LO_OS_PROCESS",
+          "LO_OS_SYNCHRONIZATION"
+        ],
+        "topological_order_codes": [
+          "LO_OS_DEADLOCKS",
+          "LO_OS_PAGING",
+          "LO_OS_PROCESS",
+          "LO_OS_PROCESS",
+          "LO_OS_SYNCHRONIZATION",
+          "LO_OS_RAG",
+          "LO_OS_TLB",
+          "LO_OS_SCHEDULING",
+          "LO_OS_SYNCHRONIZATION",
+          "LO_OS_THREADS",
+          "LO_OS_SCHEDULING",
+          "LO_OS_DEADLOCKS",
+          "LO_OS_SEMAPHORES",
+          "LO_OS_BANKER",
+          "LO_OS_PAGE_REPLACEMENT",
+          "LO_OS_CLASSICAL_PROBLEMS"
+        ]
+      },
+      "knowledge_files": [
+        {
+          "filename": "os_concurrency_and_scheduling.md",
+          "size_bytes": 5059,
+          "has_worked_examples": false,
+          "has_misconceptions": false
+        },
+        {
+          "filename": "os_deadlocks_and_resource_allocation.md",
+          "size_bytes": 4414,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        },
+        {
+          "filename": "os_memory_paging_and_virtual_memory.md",
+          "size_bytes": 3783,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        },
+        {
+          "filename": "os_process_lifecycle_and_threads.md",
+          "size_bytes": 3798,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        },
+        {
+          "filename": "os_synchronization_and_semaphores.md",
+          "size_bytes": 4250,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        }
+      ],
+      "knowledge_files_count": 5,
+      "topics": [
+        {
+          "code": "OS_CORE",
+          "title": "Process Management, Concurrency & Deadlocks",
+          "objectives_count": 4,
+          "objectives": [
+            {
+              "code": "LO_OS_PROCESS",
+              "title": "Process Lifecycle & PCB",
+              "question_count": 1,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_OS_SCHEDULING",
+              "title": "CPU Scheduling (FCFS, SJF, RR)",
+              "question_count": 2,
+              "prerequisites": [
+                "LO_OS_PROCESS"
+              ]
+            },
+            {
+              "code": "LO_OS_SYNCHRONIZATION",
+              "title": "Critical Section & Semaphores",
+              "question_count": 2,
+              "prerequisites": [
+                "LO_OS_PROCESS"
+              ]
+            },
+            {
+              "code": "LO_OS_DEADLOCKS",
+              "title": "Coffman Conditions & Deadlock",
+              "question_count": 1,
+              "prerequisites": [
+                "LO_OS_SYNCHRONIZATION"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "OS_PROC_SCHED",
+          "title": "Process Management & CPU Scheduling",
+          "objectives_count": 3,
+          "objectives": [
+            {
+              "code": "LO_OS_PROCESS",
+              "title": "Process Lifecycle & PCB",
+              "question_count": 1,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_OS_THREADS",
+              "title": "Threads & Concurrency Models",
+              "question_count": 1,
+              "prerequisites": [
+                "628b7385-1cea-457c-b598-3815a6fca350"
+              ]
+            },
+            {
+              "code": "LO_OS_SCHEDULING",
+              "title": "CPU Scheduling Algorithms",
+              "question_count": 1,
+              "prerequisites": [
+                "628b7385-1cea-457c-b598-3815a6fca350"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "OS_SYNCH",
+          "title": "Concurrency & Process Synchronization",
+          "objectives_count": 3,
+          "objectives": [
+            {
+              "code": "LO_OS_SYNCHRONIZATION",
+              "title": "Critical Section & Peterson's Algorithm",
+              "question_count": 2,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_OS_SEMAPHORES",
+              "title": "Semaphores & Mutex Locks",
+              "question_count": 1,
+              "prerequisites": [
+                "ad608c61-873a-43b0-ac53-e72cd71fbfb5"
+              ]
+            },
+            {
+              "code": "LO_OS_CLASSICAL_PROBLEMS",
+              "title": "Classical Synchronization Problems",
+              "question_count": 1,
+              "prerequisites": [
+                "d60bcc06-f4c4-4192-98d4-f2ff31e9618d"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "OS_DEADLOCK",
+          "title": "Deadlocks & Resource Allocation",
+          "objectives_count": 3,
+          "objectives": [
+            {
+              "code": "LO_OS_DEADLOCKS",
+              "title": "Coffman Conditions for Deadlock",
+              "question_count": 2,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_OS_RAG",
+              "title": "Resource Allocation Graphs (RAG)",
+              "question_count": 1,
+              "prerequisites": [
+                "7d04044d-2c61-4373-a71e-a8579a33f9a3"
+              ]
+            },
+            {
+              "code": "LO_OS_BANKER",
+              "title": "Banker's Algorithm & Safe States",
+              "question_count": 1,
+              "prerequisites": [
+                "4c2440f1-7870-44a1-8e64-459840b6a929"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "OS_MEMORY",
+          "title": "Memory Management & Virtual Memory",
+          "objectives_count": 3,
+          "objectives": [
+            {
+              "code": "LO_OS_PAGING",
+              "title": "Paging & Address Translation",
+              "question_count": 2,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_OS_TLB",
+              "title": "TLB & Effective Access Time",
+              "question_count": 1,
+              "prerequisites": [
+                "59056b14-07f3-4d37-9d1d-585f04a9c78c"
+              ]
+            },
+            {
+              "code": "LO_OS_PAGE_REPLACEMENT",
+              "title": "Page Replacement Algorithms",
+              "question_count": 1,
+              "prerequisites": [
+                "777d9ba3-3be5-4e39-8e4f-73e1d60078a1"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "CS305": {
+      "course_id": "8fb75ef3-5c18-411b-8a92-fbae38926ab0",
+      "title": "Computer Networks & Internet Protocols",
+      "topics_count": 4,
+      "objectives_count": 8,
+      "questions_count": 12,
+      "difficulty_distribution": {
+        "introductory": 4,
+        "intermediate": 7,
+        "advanced": 1
+      },
+      "dag_validation": {
+        "course_code": "CS305",
+        "total_nodes": 8,
+        "is_acyclic": true,
+        "cycle_count": 0,
+        "roots_count": 2,
+        "roots": [
+          "LO_CS305_FOUNDATIONS",
+          "LO_NET_OSI_LAYERS"
+        ],
+        "topological_order_codes": [
+          "LO_CS305_FOUNDATIONS",
+          "LO_NET_OSI_LAYERS",
+          "LO_CS305_APPLICATION",
+          "LO_NET_ENCAPSULATION",
+          "LO_NET_TCP_HANDSHAKE",
+          "LO_NET_IP_SUBNETTING",
+          "LO_NET_CONGESTION",
+          "LO_NET_ROUTING_PROTOCOLS"
+        ]
+      },
+      "knowledge_files": [
+        {
+          "filename": "cn_layered_architecture_and_osi.md",
+          "size_bytes": 3542,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        },
+        {
+          "filename": "cn_network_routing_and_ip.md",
+          "size_bytes": 4057,
+          "has_worked_examples": true,
+          "has_misconceptions": true
+        },
+        {
+          "filename": "cn_transport_layer_tcp_udp.md",
+          "size_bytes": 3457,
+          "has_worked_examples": false,
+          "has_misconceptions": true
+        }
+      ],
+      "knowledge_files_count": 3,
+      "topics": [
+        {
+          "code": "CS305_CORE",
+          "title": "CS305 Core Principles",
+          "objectives_count": 2,
+          "objectives": [
+            {
+              "code": "LO_CS305_FOUNDATIONS",
+              "title": "CS305 Foundations & Terminology",
+              "question_count": 0,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_CS305_APPLICATION",
+              "title": "CS305 Applied Analysis & Problem Solving",
+              "question_count": 0,
+              "prerequisites": [
+                "9bab20ae-e113-4339-b4a0-7aaa20ba0781"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "NET_ARCH",
+          "title": "Layered Architectures & Protocol Models",
+          "objectives_count": 2,
+          "objectives": [
+            {
+              "code": "LO_NET_OSI_LAYERS",
+              "title": "OSI 7-Layer vs TCP/IP Architecture",
+              "question_count": 2,
+              "prerequisites": []
+            },
+            {
+              "code": "LO_NET_ENCAPSULATION",
+              "title": "Protocol Data Units & Encapsulation",
+              "question_count": 2,
+              "prerequisites": [
+                "80375f52-3c41-4a1e-ae4a-cfc2e30dc710"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "NET_TRANSPORT",
+          "title": "Transport Layer Protocols & Reliability",
+          "objectives_count": 2,
+          "objectives": [
+            {
+              "code": "LO_NET_TCP_HANDSHAKE",
+              "title": "TCP 3-Way Handshake & Connection States",
+              "question_count": 2,
+              "prerequisites": [
+                "406e03be-69c8-45fe-b164-a91fbedebabd"
+              ]
+            },
+            {
+              "code": "LO_NET_CONGESTION",
+              "title": "Flow Control vs Congestion Control",
+              "question_count": 2,
+              "prerequisites": [
+                "d09c09d8-a057-4eb4-b984-3c857d708375"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "NET_ROUTING",
+          "title": "Network Layer Addressing & Routing Protocols",
+          "objectives_count": 2,
+          "objectives": [
+            {
+              "code": "LO_NET_IP_SUBNETTING",
+              "title": "IPv4 CIDR Addressing & Subnet Calculation",
+              "question_count": 2,
+              "prerequisites": [
+                "406e03be-69c8-45fe-b164-a91fbedebabd"
+              ]
+            },
+            {
+              "code": "LO_NET_ROUTING_PROTOCOLS",
+              "title": "Distance-Vector vs Link-State Routing",
+              "question_count": 2,
+              "prerequisites": [
+                "1e4223c5-fd19-44ad-8797-e0b8a51f2d3e"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_courses": 3,
+    "total_topics": 13,
+    "total_objectives": 38,
+    "total_questions": 57,
+    "total_knowledge_files": 13,
+    "total_cycles": 0,
+    "all_acyclic": true
+  }
+}

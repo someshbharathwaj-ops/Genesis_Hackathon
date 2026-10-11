@@ -109,13 +109,18 @@ class TutorService:
             temperature=0.2,
         )
 
-        # 9. Return structured pedagogical response without touching grading or mastery state
+        # 9. Format and validate structured pedagogical response
+        structured_answer = GroundedTutorEngine.sanitize_and_structure_response(
+            raw_text=model_resp.text,
+            citations=prompt.citations,
+        )
+
         warning_msg = (
             "Context was truncated to adhere to safety bounds." if prompt.truncated else None
         )
 
         return TutorQueryResponse(
-            answer=model_resp.text,
+            answer=structured_answer,
             citations=prompt.citations,
             abstention_recommended=False,
             course_id=course_id,
