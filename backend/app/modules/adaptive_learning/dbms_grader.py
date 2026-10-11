@@ -92,9 +92,7 @@ class DBMSDeterministicGrader:
             actual_raw = submitted_answer.get("candidate_keys") or submitted_answer.get("value", [])
             if isinstance(actual_raw, str):
                 actual_raw = [actual_raw]
-            actual_keys: set[frozenset[str]] = {
-                frozenset(parse_attributes(k)) for k in actual_raw
-            }
+            actual_keys: set[frozenset[str]] = {frozenset(parse_attributes(k)) for k in actual_raw}
 
             exp_repr = sorted(["".join(sorted(k)) for k in expected_keys])
             act_repr = sorted(["".join(sorted(k)) for k in actual_keys])
@@ -110,23 +108,24 @@ class DBMSDeterministicGrader:
                 missing_keys = expected_keys - actual_keys
                 extra_keys = actual_keys - expected_keys
                 if missing_keys:
-                    deductions.append({
-                        "reason": "Missing candidate keys",
-                        "keys": sorted(["".join(sorted(k)) for k in missing_keys]),
-                    })
+                    deductions.append(
+                        {
+                            "reason": "Missing candidate keys",
+                            "keys": sorted(["".join(sorted(k)) for k in missing_keys]),
+                        }
+                    )
                 if extra_keys:
-                    deductions.append({
-                        "reason": "Spurious or non-minimal keys submitted",
-                        "keys": sorted(["".join(sorted(k)) for k in extra_keys]),
-                    })
+                    deductions.append(
+                        {
+                            "reason": "Spurious or non-minimal keys submitted",
+                            "keys": sorted(["".join(sorted(k)) for k in extra_keys]),
+                        }
+                    )
 
         elif rubric_type == "minimal_cover":
             # 3. Minimal Cover Evaluation
             expected_fds = parse_fd_list(answer_key.get("fds", []))
-            actual_raw_fds = (
-                submitted_answer.get("fds")
-                or submitted_answer.get("value", [])
-            )
+            actual_raw_fds = submitted_answer.get("fds") or submitted_answer.get("value", [])
             if isinstance(actual_raw_fds, str):
                 actual_raw_fds = [s.strip() for s in actual_raw_fds.split(";") if s.strip()]
             elif not isinstance(actual_raw_fds, list):
@@ -149,13 +148,9 @@ class DBMSDeterministicGrader:
                 )
 
             # Check 1: Singleton RHS
-            has_singleton_rhs = (
-                bool(actual_fds) and all(len(rhs) == 1 for _, rhs in actual_fds)
-            )
+            has_singleton_rhs = bool(actual_fds) and all(len(rhs) == 1 for _, rhs in actual_fds)
             if not has_singleton_rhs and not malformed_syntax:
-                deductions.append(
-                    {"reason": "Not all functional dependencies have singleton RHS"}
-                )
+                deductions.append({"reason": "Not all functional dependencies have singleton RHS"})
 
             # Check 2: Closure Equivalence
             equiv = bool(actual_fds) and are_fd_sets_equivalent(actual_fds, expected_fds)
@@ -183,9 +178,8 @@ class DBMSDeterministicGrader:
             fds = parse_fd_list(answer_key.get("fds", []))
             target_nf = rubric.get("target_normal_form", "BCNF")
 
-            sub_relations_raw = (
-                submitted_answer.get("relations")
-                or submitted_answer.get("value", [])
+            sub_relations_raw = submitted_answer.get("relations") or submitted_answer.get(
+                "value", []
             )
             if isinstance(sub_relations_raw, str):
                 sub_relations_raw = [s.strip() for s in sub_relations_raw.split(";") if s.strip()]
@@ -251,11 +245,13 @@ class DBMSDeterministicGrader:
                 base_score = max_score
                 evaluation_steps.append("Exact answer key match confirmed.")
             else:
-                deductions.append({
-                    "reason": "Submitted answer differs from authoritative key",
-                    "expected": expected_val,
-                    "submitted": submitted_val,
-                })
+                deductions.append(
+                    {
+                        "reason": "Submitted answer differs from authoritative key",
+                        "expected": expected_val,
+                        "submitted": submitted_val,
+                    }
+                )
 
         # Apply hint-assisted discount if applicable (Rule 4: Whint <= 0.35)
         final_score = base_score

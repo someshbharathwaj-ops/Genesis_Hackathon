@@ -193,9 +193,7 @@ class CurriculumValidator:
                     key=lambda i: node_display_name.get(unique_nodes[i], unique_nodes[i]),
                 )
             rotated = (
-                unique_nodes[start_idx:]
-                + unique_nodes[:start_idx]
-                + [unique_nodes[start_idx]]
+                unique_nodes[start_idx:] + unique_nodes[:start_idx] + [unique_nodes[start_idx]]
             )
             cycle_str = " -> ".join(node_display_name.get(nid, nid) for nid in rotated)
             raise RecallException(

@@ -83,9 +83,7 @@ class SchedulingService:
         objective_ids = [lo.id for lo in objectives]
 
         # 2. Fetch all student attempts for questions belonging to these objectives
-        attempts = await self.attempt_repo.list_by_student_for_objectives(
-            student_id, objective_ids
-        )
+        attempts = await self.attempt_repo.list_by_student_for_objectives(student_id, objective_ids)
 
         q_ids = {a.question_id for a in attempts}
         q_to_lo: dict[str, str] = {}

@@ -96,9 +96,8 @@ class DeterministicMockLanguageModelProvider(BaseLanguageModelProvider):
 
         # Handle Revisor audit requests
         if (
-            (system_prompt and "revisor" in system_prompt.lower())
-            or "instructions for audit report" in prompt.lower()
-        ):
+            system_prompt and "revisor" in system_prompt.lower()
+        ) or "instructions for audit report" in prompt.lower():
             cand_m = re.search(
                 r"CANDIDATE TEXT UNDER REVIEW:\s*(.*?)(?=\nINSTRUCTIONS|$)",
                 prompt,
@@ -118,11 +117,7 @@ class DeterministicMockLanguageModelProvider(BaseLanguageModelProvider):
                     "- Candidate text references external concepts not substantiated by "
                     "syllabus excerpts."
                 )
-            elif (
-                "contradiction" in cand_text
-                or "wrong" in cand_text
-                or "false" in cand_text
-            ):
+            elif "contradiction" in cand_text or "wrong" in cand_text or "false" in cand_text:
                 status_str = "CONTRADICTION_DETECTED"
                 summary_str = "Candidate text directly contradicts official course materials."
                 fi_str = "- Candidate text states rules contrary to the provided lecture excerpts."

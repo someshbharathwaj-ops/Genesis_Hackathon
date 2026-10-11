@@ -63,10 +63,7 @@ def test_grade_candidate_keys() -> None:
         max_score=2.0,
     )
     assert res_extra.is_correct is False
-    assert any(
-        "Spurious or non-minimal" in d["reason"]
-        for d in res_extra.provenance["deductions"]
-    )
+    assert any("Spurious or non-minimal" in d["reason"] for d in res_extra.provenance["deductions"])
 
 
 @pytest.mark.unit

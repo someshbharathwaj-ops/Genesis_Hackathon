@@ -32,9 +32,7 @@ class CourseDocument(Base, UUIDMixin, TimestampMixin):
     """Uploaded curriculum document (PDF, slides, syllabus) for a course."""
 
     __tablename__ = "course_documents"
-    __table_args__ = (
-        UniqueConstraint("course_id", "content_hash", name="uq_course_doc_hash"),
-    )
+    __table_args__ = (UniqueConstraint("course_id", "content_hash", name="uq_course_doc_hash"),)
 
     course_id: Mapped[str] = mapped_column(
         String(36),
