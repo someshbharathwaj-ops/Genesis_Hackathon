@@ -118,11 +118,11 @@ export function SchedulingTab({
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="tactile-card p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs font-bold text-ink-muted">
-            <span>Total Queue Items</span>
+            <span>Total Queue Objectives</span>
             <Calendar className="w-4 h-4 text-brand-cyan" />
           </div>
           <div className="text-3xl font-black text-ink mt-2">
-            {queue?.total_queue_items || 0}
+            {queue?.total_objectives_evaluated ?? queue?.total_queue_items ?? 0}
           </div>
           <div className="text-[11px] text-ink-muted font-medium mt-1">
             Active objectives in course
@@ -135,7 +135,7 @@ export function SchedulingTab({
             <TrendingDown className="w-4 h-4 text-brand-coral" />
           </div>
           <div className="text-3xl font-black text-brand-coral mt-2">
-            {queue?.overdue_items_count || 0}
+            {queue?.overdue_count ?? queue?.overdue_items_count ?? 0}
           </div>
           <div className="text-[11px] text-ink-muted font-medium mt-1">
             Estimated Retention R(t) &lt; 0.70
@@ -148,7 +148,7 @@ export function SchedulingTab({
             <Lock className="w-4 h-4 text-brand-yellow" />
           </div>
           <div className="text-3xl font-black text-ink mt-2">
-            {queue?.locked_items_count || 0}
+            {queue?.working_memory_locked_count ?? queue?.locked_items_count ?? 0}
           </div>
           <div className="text-[11px] text-ink-muted font-medium mt-1">
             Under 1 hour cooldown boundary
@@ -180,40 +180,47 @@ export function SchedulingTab({
                     <th className="p-3">Estimated R(t)</th>
                     <th className="p-3">Stability</th>
                     <th className="p-3">Rule 6 Status</th>
-                    <th className="p-3">Priority</th>
+                    <th className="p-3">Urgency Score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y border-ink/10 font-medium">
-                  {queue?.items.map((item) => (
-                    <tr key={item.objective_id} className="hover:bg-surface-warm/20">
-                      <td className="p-3">
-                        <div className="font-black text-ink">{item.objective_code}</div>
-                        <div className="text-[10px] text-ink-muted">{item.title}</div>
-                      </td>
-                      <td className="p-3 font-mono font-bold text-ink">
-                        {(item.estimated_retention * 100).toFixed(1)}%
-                      </td>
-                      <td className="p-3 font-mono text-ink">
-                        {item.stability_days.toFixed(1)}d
-                      </td>
-                      <td className="p-3">
-                        {item.is_working_memory_locked ? (
-                          <span className="tactile-tag bg-brand-coral/20 text-brand-coral text-[9px] py-0 px-1.5 uppercase font-bold">
-                            <Lock className="w-2.5 h-2.5 inline mr-1" />
-                            Cooldown ({item.cooldown_remaining_seconds}s)
-                          </span>
-                        ) : (
-                          <span className="tactile-tag bg-brand-green/20 text-brand-green text-[9px] py-0 px-1.5 uppercase font-bold">
-                            <CheckCircle2 className="w-2.5 h-2.5 inline mr-1" />
-                            Eligible
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 font-mono text-ink font-bold">
-                        {item.review_priority.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {queue?.items?.map((item) => {
+                    const isLocked = item.in_working_memory ?? item.is_working_memory_locked ?? false;
+                    const stability = item.retention_stability_days ?? item.stability_days ?? 0;
+                    const urgency = item.urgency_score ?? item.review_priority ?? 0;
+                    const titleText = item.objective_title || item.title || "";
+
+                    return (
+                      <tr key={item.objective_id} className="hover:bg-surface-warm/20">
+                        <td className="p-3">
+                          <div className="font-black text-ink">{item.objective_code}</div>
+                          {titleText && <div className="text-[10px] text-ink-muted">{titleText}</div>}
+                        </td>
+                        <td className="p-3 font-mono font-bold text-ink">
+                          {((item.estimated_retention ?? 0) * 100).toFixed(1)}%
+                        </td>
+                        <td className="p-3 font-mono text-ink">
+                          {stability.toFixed(1)}d
+                        </td>
+                        <td className="p-3">
+                          {isLocked ? (
+                            <span className="tactile-tag bg-brand-coral/20 text-brand-coral text-[9px] py-0 px-1.5 uppercase font-bold">
+                              <Lock className="w-2.5 h-2.5 inline mr-1" />
+                              Working Memory Cooldown
+                            </span>
+                          ) : (
+                            <span className="tactile-tag bg-brand-green/20 text-brand-green text-[9px] py-0 px-1.5 uppercase font-bold">
+                              <CheckCircle2 className="w-2.5 h-2.5 inline mr-1" />
+                              Retention Eligible
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 font-mono text-ink font-bold">
+                          {urgency.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -227,53 +234,64 @@ export function SchedulingTab({
             <span>Session Plan Inspector</span>
           </h3>
 
-          {plannedPlan ? (
-            <div className="tactile-card p-5 flex flex-col gap-4">
-              <div className="flex items-center justify-between pb-2 border-b border-ink/10">
-                <span className="tactile-tag bg-brand-yellow text-ink text-xs">
-                  {plannedPlan.assessment_context}
-                </span>
-                <span className="text-xs font-bold text-ink-muted">
-                  Bounded ≤ {plannedPlan.total_questions} Questions
-                </span>
-              </div>
+          {plannedPlan ? (() => {
+            const planItems = plannedPlan.planned_items || (plannedPlan as any).planned_questions || [];
+            const contextName = plannedPlan.context || plannedPlan.assessment_context || "retention_review";
+            const totalCount = plannedPlan.total_items ?? (plannedPlan as any).total_questions ?? planItems.length;
+            const reasonText = plannedPlan.reason || (plannedPlan as any).rationale || "";
 
-              <div className="text-xs text-ink font-medium leading-relaxed">
-                <strong>Plan Rationale:</strong> {plannedPlan.rationale}
-              </div>
+            return (
+              <div className="tactile-card p-5 flex flex-col gap-4">
+                <div className="flex items-center justify-between pb-2 border-b border-ink/10">
+                  <span className="tactile-tag bg-brand-yellow text-ink text-xs uppercase">
+                    {contextName.replace(/_/g, " ")}
+                  </span>
+                  <span className="text-xs font-bold text-ink-muted">
+                    Bounded &le; {totalCount} Items
+                  </span>
+                </div>
 
-              <div className="flex flex-col gap-2 pt-2 border-t border-ink/10">
-                <div className="text-xs font-bold text-ink">Planned Retention Items:</div>
-                {plannedPlan.planned_questions.map((q, idx) => (
-                  <div
-                    key={q.question_id}
-                    className="p-3 bg-surface-warm/40 border border-ink rounded text-xs flex items-center justify-between"
-                  >
-                    <div>
-                      <span className="font-bold text-ink mr-2">#{idx + 1}</span>
-                      <span className="font-mono text-[11px] text-brand-cyan mr-1 font-bold">
-                        [{q.objective_code}]
-                      </span>
-                      <span className="text-ink font-medium">{q.title}</span>
-                    </div>
-                    <span className="tactile-tag bg-surface text-ink text-[9px] py-0 px-1 uppercase">
-                      {q.difficulty}
-                    </span>
+                {reasonText && (
+                  <div className="text-xs text-ink font-medium leading-relaxed">
+                    <strong>Plan Reason:</strong> {reasonText}
                   </div>
-                ))}
-              </div>
+                )}
 
-              {onStartRetentionSession && (
-                <button
-                  onClick={() => onStartRetentionSession(plannedPlan)}
-                  className="tactile-btn-yellow text-xs py-2 w-full mt-2 font-black"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Begin Spaced Retention Retest</span>
-                </button>
-              )}
-            </div>
-          ) : (
+                <div className="flex flex-col gap-2 pt-2 border-t border-ink/10">
+                  <div className="text-xs font-bold text-ink">Planned Retention Items:</div>
+                  {planItems.map((q: any, idx: number) => (
+                    <div
+                      key={q.objective_id || q.question_id || idx}
+                      className="p-3 bg-surface-warm/40 border border-ink rounded text-xs flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-bold text-ink mr-2">#{idx + 1}</span>
+                        <span className="font-mono text-[11px] text-brand-cyan mr-1 font-bold">
+                          [{q.objective_code}]
+                        </span>
+                        <span className="text-ink font-medium">
+                          {q.objective_title || q.title || "Retention Target"}
+                        </span>
+                      </div>
+                      <span className="tactile-tag bg-surface text-ink text-[9px] py-0 px-1 uppercase">
+                        {q.urgency_classification || q.difficulty || "due"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {onStartRetentionSession && (
+                  <button
+                    onClick={() => onStartRetentionSession(plannedPlan)}
+                    className="tactile-btn-yellow text-xs py-2 w-full mt-2 font-black"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Begin Spaced Retention Retest</span>
+                  </button>
+                )}
+              </div>
+            );
+          })() : (
             <div className="tactile-card p-12 text-center text-ink-muted flex flex-col items-center justify-center gap-2 min-h-[280px]">
               <Calendar className="w-8 h-8 text-ink-faint" />
               <div className="font-bold text-sm">No Active Retention Plan</div>

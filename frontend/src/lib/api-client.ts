@@ -213,20 +213,25 @@ export const recallApi = {
     courseId: string,
     studentId: string,
     candidateText: string,
-    queryOrTopic?: string,
+    queryOrTopic: string = "Course concepts and functional dependencies",
     objectiveId?: string,
     checkDeterministicLogic: boolean = true
-  ) =>
-    fetchApi<RevisorReviewResponse>(`/courses/${courseId}/revisor/review`, {
+  ) => {
+    const validQuery =
+      queryOrTopic && queryOrTopic.trim().length >= 2
+        ? queryOrTopic.trim()
+        : "Course concepts and functional dependencies";
+    return fetchApi<RevisorReviewResponse>(`/courses/${courseId}/revisor/review`, {
       method: "POST",
       body: JSON.stringify({
         student_id: studentId,
         candidate_text: candidateText,
-        query_or_topic: queryOrTopic || null,
+        query_or_topic: validQuery,
         objective_id: objectiveId || null,
         check_deterministic_logic: checkDeterministicLogic,
       }),
-    }),
+    });
+  },
 
   // Spaced Retention Scheduling (Rule 6)
   getReviewQueue: (courseId: string, studentId: string, cooldownSeconds?: number) => {

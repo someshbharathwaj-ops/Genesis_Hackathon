@@ -187,9 +187,9 @@ export function TutorTab({
               <Sparkles className="w-5 h-5 text-brand-yellow" />
               <span>Grounded Explanation</span>
             </h3>
-            {response?.model_name && (
+            {(response?.model_used || response?.model_name) && (
               <span className="tactile-tag bg-surface text-ink text-[10px]">
-                Model: {response.model_name}
+                Model: {response.model_used || response.model_name}
               </span>
             )}
           </div>
@@ -220,7 +220,7 @@ export function TutorTab({
               {/* Verified Citations List */}
               <div className="flex flex-col gap-2 pt-3 border-t border-ink/10">
                 <div className="text-xs font-bold text-ink-muted">Verified Source Citations:</div>
-                {response.citations.length === 0 ? (
+                {(!response.citations || response.citations.length === 0) ? (
                   <span className="text-xs text-ink-faint italic">No citations available.</span>
                 ) : (
                   <div className="flex flex-wrap gap-2">

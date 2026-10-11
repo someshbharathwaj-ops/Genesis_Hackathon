@@ -185,85 +185,141 @@ export interface CourseDocumentDetailResponse {
 export interface RetrievalMatchResponse {
   chunk_id: string;
   document_id: string;
-  filename: string;
+  document_filename: string;
+  filename?: string;
   page_number: number;
   content: string;
   similarity_score: number;
-  token_count: number;
+  citation?: string;
+  token_count?: number;
+  metadata_attributes?: Record<string, unknown>;
 }
 
 export interface RetrievalResponse {
   query: string;
   course_id: string;
-  matches_count: number;
+  total_candidates: number;
+  matches_count?: number;
   matches: RetrievalMatchResponse[];
+  abstention_recommended?: boolean;
+  explanation?: string;
 }
 
 // --- Mastery & Bounded Diagnosis ---
 
+export type MasteryState = "mastered" | "developing" | "needs_remediation" | "untested";
+
 export interface ObjectiveMasteryResponse {
   objective_id: string;
   objective_code: string;
-  mastery_probability: number;
-  confidence_bound_lower: number;
-  confidence_bound_upper: number;
-  attempts_count: number;
-  consecutive_correct: number;
-  status: "unassessed" | "in_progress" | "mastered";
+  performance_score: number;
+  confidence_score: number;
+  mastery_state: MasteryState;
+  prerequisites_satisfied: boolean;
+  blocked_by_prerequisites: string[];
+  total_attempts: number;
+  distinct_questions_attempted: number;
+  unassisted_correct_count: number;
+  hint_assisted_count: number;
+  details?: Record<string, unknown>;
+  // Backward compatibility aliases
+  status?: string;
+  mastery_probability?: number;
+  confidence_bound_lower?: number;
+  confidence_bound_upper?: number;
+  attempts_count?: number;
+  consecutive_correct?: number;
   last_attempt_at?: string;
 }
 
 export interface CourseMasterySummaryResponse {
   student_id: string;
   course_id: string;
-  course_mastery_index: number;
   total_objectives: number;
   mastered_count: number;
-  in_progress_count: number;
-  unassessed_count: number;
+  developing_count: number;
+  needs_remediation_count: number;
+  untested_count: number;
+  average_performance: number;
+  average_confidence: number;
   objectives: ObjectiveMasteryResponse[];
+  // Backward compatibility alias
+  course_mastery_index?: number;
+  in_progress_count?: number;
+  unassessed_count?: number;
 }
 
 export interface ObjectiveDiagnosticResponse {
   objective_id: string;
   objective_code: string;
-  status: "CONFIRMED_MASTERY" | "CONFIRMED_GAP" | "INSUFFICIENT_EVIDENCE" | "UNTESTED";
-  p_mastery: number;
-  confidence: number;
-  attempts_count: number;
-  accuracy: number;
-  evidence_rationale: string;
+  diagnostic_status: string;
+  performance_score: number;
+  confidence_score: number;
+  sufficiency_status: string;
+  prerequisites_satisfied: boolean;
+  root_cause_attribution?: string | null;
+  recommended_action: string;
+  applied_rules: string[];
+  traceable_rationale: string;
+  // Backward compatibility
+  status?: string;
+  p_mastery?: number;
+  confidence?: number;
+  attempts_count?: number;
+  accuracy?: number;
+  evidence_rationale?: string;
 }
 
 export interface CourseDiagnosticSummaryResponse {
   student_id: string;
   course_id: string;
   total_objectives: number;
-  confirmed_mastery_count: number;
-  confirmed_gap_count: number;
+  mastered_count: number;
+  developing_count: number;
+  demonstrated_weakness_count: number;
   insufficient_evidence_count: number;
   untested_count: number;
-  gap_objective_codes: string[];
-  prerequisite_failures: Array<{
+  conflicting_count: number;
+  average_performance: number;
+  average_confidence: number;
+  identified_root_cause_gaps: string[];
+  objectives: ObjectiveDiagnosticResponse[];
+  // Backward compatibility aliases
+  confirmed_mastery_count?: number;
+  confirmed_gap_count?: number;
+  gap_objective_codes?: string[];
+  prerequisite_failures?: Array<{
     target_code: string;
     unmet_prerequisite_code: string;
   }>;
-  objectives: ObjectiveDiagnosticResponse[];
+}
+
+export interface RecommendedQuestionItem {
+  question_id: string;
+  title: string;
+  objective_id: string;
+  objective_code: string;
+  difficulty: string;
+  priority_reason: string;
 }
 
 export interface DiagnosticSessionPlanResponse {
   student_id: string;
   course_id: string;
-  target_objective_id: string;
-  planned_questions: Array<{
+  target_objective_id?: string | null;
+  max_session_questions: number;
+  recommended_questions: RecommendedQuestionItem[];
+  session_rationale: string;
+  // Backward compatibility aliases
+  planned_questions?: Array<{
     question_id: string;
     objective_id: string;
     objective_code: string;
     difficulty: string;
     title: string;
   }>;
-  total_questions: number;
-  rationale: string;
+  total_questions?: number;
+  rationale?: string;
 }
 
 // --- Tutor (SLM Role A) ---
@@ -273,67 +329,122 @@ export interface TutorQueryResponse {
   citations: string[];
   retrieved_chunks_count: number;
   abstention_recommended: boolean;
-  model_name?: string;
+  course_id: string;
+  student_id: string;
+  model_used: string;
+  is_mock?: boolean;
   latency_ms?: number;
-  prompt_tokens?: number;
-  completion_tokens?: number;
+  prompt_tokens?: number | null;
+  completion_tokens?: number | null;
+  warning?: string | null;
+  // Backward compatibility alias
+  model_name?: string;
 }
 
 // --- Revisor (SLM Role B) ---
 
 export type GroundedAuditStatus =
+  | "verified_grounded"
+  | "ungrounded_claim_detected"
+  | "contradiction_detected"
+  | "insufficient_evidence"
   | "VERIFIED_GROUNDED"
   | "UNGROUNDED_CLAIM_DETECTED"
   | "DETERMINISTIC_CONTRADICTION"
   | "INSUFFICIENT_EVIDENCE";
 
 export interface RevisorReviewResponse {
-  status: GroundedAuditStatus;
-  audit_report: string;
-  supported_claims: string[];
-  unsupported_claims: string[];
-  citations: string[];
+  course_id: string;
+  student_id: string;
+  audit_status: GroundedAuditStatus;
+  is_approved: boolean;
+  summary: string;
+  verified_points: string[];
+  flagged_issues: string[];
+  suggested_revision?: string | null;
+  citations_verified: string[];
+  abstention_recommended: boolean;
+  model_used: string;
+  is_mock: boolean;
   retrieved_chunks_count: number;
-  deterministic_override_applied: boolean;
+  deterministic_validation: Record<string, unknown>;
+  warning?: string | null;
+  // Backward compatibility aliases
+  status?: GroundedAuditStatus;
+  audit_report?: string;
+  supported_claims?: string[];
+  unsupported_claims?: string[];
+  citations?: string[];
+  deterministic_override_applied?: boolean;
   model_name?: string;
   latency_ms?: number;
 }
 
 // --- Spaced Retention Scheduling (Rule 6) ---
 
-export interface RetentionItemResponse {
+export interface RetentionItemSchema {
   objective_id: string;
   objective_code: string;
-  title: string;
+  objective_title: string;
+  mastery_state: string;
+  performance_score: number;
+  confidence_score: number;
+  last_attempt_at?: string | null;
+  elapsed_hours: number;
+  in_working_memory: boolean;
+  retention_eligible: boolean;
+  interval_days: number;
+  next_review_due?: string | null;
+  retention_stability_days: number;
   estimated_retention: number;
-  stability_days: number;
-  days_since_last_attempt: number;
-  review_priority: number;
-  is_working_memory_locked: boolean;
-  cooldown_remaining_seconds: number;
+  urgency_score: number;
+  urgency_classification: string;
+  recommended_action: string;
+  metadata?: Record<string, unknown>;
+  // Backward compatibility aliases
+  title?: string;
+  stability_days?: number;
+  days_since_last_attempt?: number;
+  review_priority?: number;
+  is_working_memory_locked?: boolean;
+  cooldown_remaining_seconds?: number;
 }
+
+export type RetentionItemResponse = RetentionItemSchema;
 
 export interface ReviewQueueResponse {
   student_id: string;
   course_id: string;
-  total_queue_items: number;
-  overdue_items_count: number;
-  locked_items_count: number;
-  items: RetentionItemResponse[];
+  as_of_time: string;
+  total_objectives_evaluated: number;
+  overdue_count: number;
+  due_count: number;
+  working_memory_locked_count: number;
+  items: RetentionItemSchema[];
+  // Backward compatibility aliases
+  total_queue_items?: number;
+  overdue_items_count?: number;
+  locked_items_count?: number;
 }
 
 export interface RetentionSessionPlanResponse {
   student_id: string;
   course_id: string;
-  assessment_context: string;
-  planned_objectives: string[];
-  planned_questions: Array<{
+  as_of_time: string;
+  context: string;
+  total_items: number;
+  reason: string;
+  planned_items: RetentionItemSchema[];
+  // Backward compatibility aliases
+  assessment_context?: string;
+  planned_objectives?: string[];
+  planned_questions?: Array<{
     question_id: string;
     objective_id: string;
     objective_code: string;
     title: string;
     difficulty: string;
   }>;
-  total_questions: number;
-  rationale: string;
+  total_questions?: number;
+  rationale?: string;
 }
