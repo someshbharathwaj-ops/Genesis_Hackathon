@@ -119,6 +119,11 @@ export default function HomePage() {
 
   useEffect(() => {
     initializePlatform();
+    // Safeguard: Never let loading splash hang for more than 2 seconds
+    const timer = setTimeout(() => {
+      setAuthInitialized(true);
+    }, 2000);
+    return () => clearTimeout(timer);
   }, []);
 
   // Course Selection Handler
