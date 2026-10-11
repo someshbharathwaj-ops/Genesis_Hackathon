@@ -131,6 +131,17 @@ def require_instructor_or_admin(user: User) -> None:
         )
 
 
+def require_admin(user: User) -> None:
+    """Enforce that current user has administrator privileges."""
+    if user.role != UserRole.ADMIN:
+        raise RecallException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="FORBIDDEN",
+            title="Administrator Privileges Required",
+            detail="This operation is strictly restricted to system administrators.",
+        )
+
+
 async def verify_instructor_course_access(
     course_id: str,
     user: User,

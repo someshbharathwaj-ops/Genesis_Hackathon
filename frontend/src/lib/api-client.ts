@@ -4,6 +4,8 @@
  */
 
 import {
+  AdminAuditLogEntry,
+  AdminAuditSummaryResponse,
   AttemptCreate,
   AttemptResponse,
   AuthMeResponse,
@@ -268,4 +270,9 @@ export const recallApi = {
       }
     );
   },
+
+  // Institutional Administration & Audit
+  getAdminAuditSummary: () => fetchApi<AdminAuditSummaryResponse>("/admin/audit-summary"),
+  getAdminAuditLogs: (limit: number = 50) =>
+    fetchApi<AdminAuditLogEntry[]>(`/admin/audit-logs?limit=${limit}`),
 };

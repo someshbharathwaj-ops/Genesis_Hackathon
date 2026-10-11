@@ -33,12 +33,12 @@ async def seed_course_by_code(
     if code_upper in ("DBMS", "CS340"):
         from app.seeds.seed_dbms_questions import seed_dbms_curriculum_and_questions
 
-        return await seed_dbms_curriculum_and_questions(session)
+        return await seed_dbms_curriculum_and_questions(session, comprehensive=True)
 
     if code_upper in ("OS", "CS301"):
         from app.seeds.seed_os_questions import seed_os_curriculum_and_questions
 
-        return await seed_os_curriculum_and_questions(session)
+        return await seed_os_curriculum_and_questions(session, comprehensive=True)
 
     # General / Custom Course Seeder
     user_repo = UserRepository(session)

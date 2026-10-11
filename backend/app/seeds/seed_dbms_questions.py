@@ -289,6 +289,7 @@ SEED_QUESTIONS_DATA: list[dict[str, Any]] = [
 async def seed_dbms_curriculum_and_questions(
     session: AsyncSession,
     auto_ingest_knowledge: bool = False,
+    comprehensive: bool = False,
 ) -> dict[str, Any]:
     """Idempotently seed the DBMS course, topic, objectives, and verified questions."""
     # 1. Instructor
@@ -478,12 +479,13 @@ async def seed_dbms_curriculum_and_questions(
             # Non-fatal if filesystem folder is unavailable
             pass
 
-    try:
-        from app.seeds.seed_all_comprehensive_curriculum import seed_comprehensive_curriculum
+    if comprehensive:
+        try:
+            from app.seeds.seed_all_comprehensive_curriculum import seed_comprehensive_curriculum
 
-        await seed_comprehensive_curriculum(session)
-    except Exception:
-        pass
+            await seed_comprehensive_curriculum(session)
+        except Exception:
+            pass
 
     return {
         "status": "success",
