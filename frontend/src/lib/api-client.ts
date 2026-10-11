@@ -30,7 +30,15 @@ import {
   TutorQueryResponse,
 } from "../types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    // Match window hostname (127.0.0.1 or localhost) to prevent IPv4 vs IPv6 resolution stall
+    const host = window.location.hostname || "127.0.0.1";
+    return `http://${host}:8000/api/v1`;
+  }
+  return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+}
+
 const TOKEN_STORAGE_KEY = "recall_auth_token";
 
 export class ApiError extends Error {
@@ -63,7 +71,8 @@ export async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
   const headers = new Headers(options.headers || {});
 
   // Automatically attach Bearer token if present
@@ -76,33 +85,52 @@ export async function fetchApi<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutMs = 8000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    let problem: ProblemDetails;
-    try {
-      problem = await response.json();
-    } catch {
-      problem = {
-        type: "about:blank",
-        title: response.statusText,
-        status: response.status,
-        detail: `HTTP request failed with status ${response.status}`,
-        code: "HTTP_ERROR",
-        timestamp: new Date().toISOString(),
-      };
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal: options.signal || controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let problem: ProblemDetails;
+      try {
+        problem = await response.json();
+      } catch {
+        problem = {
+          type: "about:blank",
+          title: response.statusText,
+          status: response.status,
+          detail: `HTTP request failed with status ${response.status}`,
+          code: "HTTP_ERROR",
+          timestamp: new Date().toISOString(),
+        };
+      }
+      throw new ApiError(problem);
     }
-    throw new ApiError(problem);
-  }
 
-  if (response.status === 204) {
-    return {} as T;
-  }
+    if (response.status === 204) {
+      return {} as T;
+    }
 
-  return response.json();
+    return response.json();
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof ApiError) throw err;
+    throw new ApiError({
+      type: "about:blank",
+      title: "Network Request Error",
+      status: 0,
+      detail: err instanceof Error ? err.message : "Network error or timeout",
+      code: "NETWORK_ERROR",
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
 export const recallApi = {
