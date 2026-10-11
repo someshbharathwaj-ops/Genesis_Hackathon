@@ -41,12 +41,16 @@ async def demo_login(
     Ensures the user and DBMS course enrollment exist for a seamless hackathon demo.
     Restricted to non-production environments.
     """
-    if settings.ENVIRONMENT.lower() == "production":
+    allowed_envs = {"development", "test", "demo", "dev"}
+    if settings.ENVIRONMENT.lower() not in allowed_envs or not settings.DEBUG:
         raise RecallException(
             status_code=status.HTTP_403_FORBIDDEN,
             code="DEMO_LOGIN_DISABLED",
             title="Demo Login Forbidden",
-            detail="Demo login is strictly disabled in production environments.",
+            detail=(
+                "Demo login is strictly disabled in production and staging environments, "
+                "or when debug mode is inactive."
+            ),
         )
 
     user_repo = UserRepository(db)

@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    admin,
     attempts,
     auth,
     courses,
@@ -24,6 +25,9 @@ api_v1_router.include_router(health.router)
 
 # Authentication & identity
 api_v1_router.include_router(auth.router)
+
+# Institutional Administration & Audit (Admin role required)
+api_v1_router.include_router(admin.router)
 
 # Domain engine endpoints
 api_v1_router.include_router(users.router)

@@ -449,3 +449,46 @@ export interface RetentionSessionPlanResponse {
   total_questions?: number;
   rationale?: string;
 }
+
+// --- Institutional Administration & Audit ---
+
+export interface CourseAuditBreakdown {
+  id: string;
+  code: string;
+  title: string;
+  enrolled_students: number;
+  verified_questions: number;
+  ingested_chunks: number;
+}
+
+export interface AdminAuditSummaryResponse {
+  status: string;
+  system_telemetry: {
+    fastapi_gateway: string;
+    database_engine: string;
+    environment: string;
+    model_provider: string;
+    adr_0001_deterministic_grader: string;
+    adr_0002_assessment_lockout: string;
+  };
+  aggregate_counts: {
+    total_courses: number;
+    total_students: number;
+    total_instructors: number;
+    verified_questions: number;
+    ingested_chunks: number;
+  };
+  course_summaries: CourseAuditBreakdown[];
+}
+
+export interface AdminAuditLogEntry {
+  id: string;
+  timestamp: string;
+  actor: string;
+  role: string;
+  courseCode: string;
+  action: string;
+  provenanceHash: string;
+  verdict: "VERIFIED" | "REMEDIATION_NEEDED" | "BLOCKED_LOCKOUT" | "GROUNDED" | "CONTRADICTION" | "NEUTRAL";
+  details: string;
+}

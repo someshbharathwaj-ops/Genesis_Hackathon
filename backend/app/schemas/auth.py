@@ -1,4 +1,4 @@
-"""Authentication and session schemas."""
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -12,9 +12,9 @@ class LoginRequest(BaseModel):
 
 
 class DemoLoginRequest(BaseModel):
-    """Demo login shortcut."""
+    """Demo login shortcut strictly restricted to supported evaluation roles."""
 
-    role: str = "student"  # "student" or "instructor"
+    role: Literal["student", "instructor", "admin"] = "student"
     course_code: str = "CS340"
 
 

@@ -18,7 +18,13 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { CourseResponse, HealthResponse, UserResponse } from "../types";
+import {
+  AdminAuditLogEntry,
+  AdminAuditSummaryResponse,
+  CourseResponse,
+  HealthResponse,
+  UserResponse,
+} from "../types";
 import { recallApi } from "../lib/api-client";
 
 interface AdminAuditDashboardProps {
@@ -27,100 +33,43 @@ interface AdminAuditDashboardProps {
   onRefreshCourses?: () => void;
 }
 
-interface AuditLogEntry {
-  id: string;
-  timestamp: string;
-  actor: string;
-  role: string;
-  courseCode: string;
-  action: string;
-  provenanceHash: string;
-  verdict: "VERIFIED" | "BLOCKED_LOCKOUT" | "GROUNDED" | "CONTRADICTION" | "NEUTRAL";
-  details: string;
-}
-
 export function AdminAuditDashboard({
   currentUser,
   courses,
   onRefreshCourses,
 }: AdminAuditDashboardProps) {
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [auditSummary, setAuditSummary] = useState<AdminAuditSummaryResponse | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [filterCourse, setFilterCourse] = useState<string>("ALL");
 
-  // Simulated live institutional audit ledger events
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([
-    {
-      id: "LOG-9041",
-      timestamp: new Date(Date.now() - 1000 * 60 * 2).toLocaleTimeString(),
-      actor: "Ada Lovelace",
-      role: "student",
-      courseCode: "CS301",
-      action: "TUTOR_QUERY",
-      provenanceHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      verdict: "GROUNDED",
-      details: "Query on Coffman deadlock conditions grounded strictly against os_concurrency_and_scheduling.md",
-    },
-    {
-      id: "LOG-9040",
-      timestamp: new Date(Date.now() - 1000 * 60 * 5).toLocaleTimeString(),
-      actor: "Ada Lovelace",
-      role: "student",
-      courseCode: "CS340",
-      action: "ATTEMPT_EVALUATION",
-      provenanceHash: "7d1a58b29f9c011e4b3f885e3170a481c95b706c9a4087e59600109d9426f092",
-      verdict: "VERIFIED",
-      details: "Deterministic mathematical grader executed for attribute closure {A}+. Score: 1.0/1.0",
-    },
-    {
-      id: "LOG-9039",
-      timestamp: new Date(Date.now() - 1000 * 60 * 12).toLocaleTimeString(),
-      actor: "Ada Lovelace",
-      role: "student",
-      courseCode: "CS340",
-      action: "SCORED_ASSESSMENT_LOCKOUT",
-      provenanceHash: "19f9a2e3811c002b88f918907604adbf1052631a00a402e1b4396dc1e737119e",
-      verdict: "BLOCKED_LOCKOUT",
-      details: "Tutor and Revisor queries locked out during active scored test (ADR 0002 Enforcement)",
-    },
-    {
-      id: "LOG-9038",
-      timestamp: new Date(Date.now() - 1000 * 60 * 25).toLocaleTimeString(),
-      actor: "Prof. Andrew Tanenbaum",
-      role: "instructor",
-      courseCode: "CS301",
-      action: "COURSE_MATERIALS_INGEST",
-      provenanceHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      verdict: "VERIFIED",
-      details: "13 Operating Systems lecture documents ingested into CS301 knowledge base",
-    },
-    {
-      id: "LOG-9037",
-      timestamp: new Date(Date.now() - 1000 * 60 * 40).toLocaleTimeString(),
-      actor: "Prof. E. F. Codd",
-      role: "instructor",
-      courseCode: "CS340",
-      action: "REVISOR_CONCEPT_AUDIT",
-      provenanceHash: "8c91a001b22e1189dca394f0017e889b7410091efadbc2e9870001bcde881201",
-      verdict: "CONTRADICTION",
-      details: "Contradiction detected on erroneous candidate closure claim against relational axioms",
-    },
-  ]);
-
-  const fetchHealth = async () => {
+  const fetchAdminData = async () => {
     setLoading(true);
+    setErrorMessage(null);
     try {
-      const h = await recallApi.getHealth();
+      const [h, summary, logs] = await Promise.all([
+        recallApi.getHealth().catch(() => null),
+        recallApi.getAdminAuditSummary().catch((err) => {
+          setErrorMessage(err.message || "Failed to load audit summary");
+          return null;
+        }),
+        recallApi.getAdminAuditLogs(50).catch(() => []),
+      ]);
       setHealth(h);
-    } catch {
-      setHealth(null);
+      setAuditSummary(summary);
+      setAuditLogs(logs);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error fetching institutional audit data";
+      setErrorMessage(msg);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchHealth();
+    fetchAdminData();
   }, []);
 
   const filteredLogs =
@@ -133,8 +82,9 @@ export function AdminAuditDashboard({
       generatedAt: new Date().toISOString(),
       generatedBy: currentUser?.email || "admin.audit@recall.edu",
       systemStatus: health || "operational",
-      totalCourses: courses.length,
-      courses: courses.map((c) => ({ code: c.code, title: c.title, id: c.id })),
+      telemetry: auditSummary?.system_telemetry || null,
+      aggregateCounts: auditSummary?.aggregate_counts || null,
+      courses: auditSummary?.course_summaries || courses,
       auditEvents: auditLogs,
     };
     const blob = new Blob([JSON.stringify(reportData, null, 2)], {
@@ -171,7 +121,7 @@ export function AdminAuditDashboard({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchHealth}
+            onClick={fetchAdminData}
             disabled={loading}
             className="tactile-btn-white text-xs py-2 px-3 font-bold flex items-center gap-1.5"
           >
@@ -188,6 +138,12 @@ export function AdminAuditDashboard({
         </div>
       </div>
 
+      {errorMessage && (
+        <div className="p-4 bg-brand-coral/15 border-2 border-brand-coral rounded-friendly-sm text-xs font-bold text-ink">
+          {errorMessage}
+        </div>
+      )}
+
       {/* Top Telemetry Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: System Engine Health */}
@@ -197,7 +153,7 @@ export function AdminAuditDashboard({
             <Server className="w-4 h-4 text-brand-green" />
           </div>
           <div className="text-xl font-black text-ink">
-            {health?.status === "healthy" ? "100% Operational" : "Active (Uvicorn)"}
+            {health?.status === "ok" ? "100% Operational" : "Active (Uvicorn)"}
           </div>
           <div className="flex items-center gap-1.5 text-[11px] font-bold text-brand-green">
             <CheckCircle className="w-3.5 h-3.5" />
@@ -211,10 +167,12 @@ export function AdminAuditDashboard({
             <span className="text-xs font-bold text-ink-muted">SLM Grounding Engine</span>
             <Sparkles className="w-4 h-4 text-brand-yellow" />
           </div>
-          <div className="text-xl font-black text-ink">Phi-3 Mini (3.8B)</div>
+          <div className="text-xl font-black text-ink">
+            {auditSummary?.system_telemetry?.model_provider || "Phi-3 Mini (3.8B)"}
+          </div>
           <div className="flex items-center gap-1.5 text-[11px] font-bold text-ink-muted">
             <Activity className="w-3.5 h-3.5 text-brand-yellow" />
-            <span>Ollama Local &bull; Temperature 0.2</span>
+            <span>Ollama Adapter &bull; Strict Course Grounding</span>
           </div>
         </div>
 
@@ -245,6 +203,32 @@ export function AdminAuditDashboard({
         </div>
       </div>
 
+      {/* Aggregate Platform Totals */}
+      {auditSummary?.aggregate_counts && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="tactile-card p-3 text-center">
+            <span className="text-[10px] text-ink-muted font-bold block">COURSES</span>
+            <span className="text-lg font-black text-ink">{auditSummary.aggregate_counts.total_courses}</span>
+          </div>
+          <div className="tactile-card p-3 text-center">
+            <span className="text-[10px] text-ink-muted font-bold block">STUDENTS</span>
+            <span className="text-lg font-black text-ink">{auditSummary.aggregate_counts.total_students}</span>
+          </div>
+          <div className="tactile-card p-3 text-center">
+            <span className="text-[10px] text-ink-muted font-bold block">INSTRUCTORS</span>
+            <span className="text-lg font-black text-ink">{auditSummary.aggregate_counts.total_instructors}</span>
+          </div>
+          <div className="tactile-card p-3 text-center">
+            <span className="text-[10px] text-ink-muted font-bold block">VERIFIED QUESTIONS</span>
+            <span className="text-lg font-black text-brand-cyan">{auditSummary.aggregate_counts.verified_questions}</span>
+          </div>
+          <div className="tactile-card p-3 text-center">
+            <span className="text-[10px] text-ink-muted font-bold block">INGESTED CHUNKS</span>
+            <span className="text-lg font-black text-brand-green">{auditSummary.aggregate_counts.ingested_chunks}</span>
+          </div>
+        </div>
+      )}
+
       {/* Multi-Course Institutional Registry */}
       <div className="tactile-card p-5 flex flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -265,29 +249,38 @@ export function AdminAuditDashboard({
               <tr className="border-b-2 border-ink/20 text-ink-muted font-bold">
                 <th className="py-2.5 px-3">Course Code</th>
                 <th className="py-2.5 px-3">Course Title</th>
-                <th className="py-2.5 px-3">Course ID</th>
+                <th className="py-2.5 px-3">Enrolled Students</th>
+                <th className="py-2.5 px-3">Verified Questions</th>
+                <th className="py-2.5 px-3">Ingested Chunks</th>
                 <th className="py-2.5 px-3">Status</th>
-                <th className="py-2.5 px-3">SLM Grounding</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink/10 font-medium text-ink">
-              {courses.map((course) => (
+              {(auditSummary?.course_summaries || courses.map(c => ({
+                id: c.id,
+                code: c.code,
+                title: c.title,
+                enrolled_students: 0,
+                verified_questions: 0,
+                ingested_chunks: 0,
+              }))).map((course) => (
                 <tr key={course.id} className="hover:bg-surface-warm/40">
                   <td className="py-3 px-3 font-mono font-black text-brand-cyan">
                     {course.code}
                   </td>
                   <td className="py-3 px-3 font-bold text-ink">{course.title}</td>
-                  <td className="py-3 px-3 font-mono text-[11px] text-ink-muted">
-                    {course.id}
+                  <td className="py-3 px-3 font-mono font-bold text-ink">
+                    {"enrolled_students" in course ? course.enrolled_students : 0}
+                  </td>
+                  <td className="py-3 px-3 font-mono font-bold text-brand-cyan">
+                    {"verified_questions" in course ? course.verified_questions : 0}
+                  </td>
+                  <td className="py-3 px-3 font-mono font-bold text-brand-green">
+                    {"ingested_chunks" in course ? course.ingested_chunks : 0}
                   </td>
                   <td className="py-3 px-3">
                     <span className="tactile-tag bg-brand-green/20 text-ink text-[10px] py-0 px-2 font-bold">
                       INITIALIZED & ACTIVE
-                    </span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="tactile-tag bg-brand-yellow/20 text-ink text-[10px] py-0 px-2 font-bold">
-                      INDEXED VECTOR STORE
                     </span>
                   </td>
                 </tr>
@@ -303,7 +296,7 @@ export function AdminAuditDashboard({
           <div className="flex items-center gap-2">
             <FileCheck className="w-4 h-4 text-brand-green" />
             <h3 className="font-black text-base text-ink">
-              Institutional SLM & Evaluation Audit Ledger
+              Institutional Evaluation & Attempt Audit Ledger
             </h3>
           </div>
 
@@ -324,65 +317,77 @@ export function AdminAuditDashboard({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr className="border-b-2 border-ink/20 text-ink-muted font-bold">
-                <th className="py-2.5 px-3">Log ID</th>
-                <th className="py-2.5 px-3">Timestamp</th>
-                <th className="py-2.5 px-3">Actor & Role</th>
-                <th className="py-2.5 px-3">Course</th>
-                <th className="py-2.5 px-3">Event Action</th>
-                <th className="py-2.5 px-3">Verdict</th>
-                <th className="py-2.5 px-3">Provenance Hash (SHA-256)</th>
-                <th className="py-2.5 px-3">Audit Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink/10 font-medium text-ink">
-              {filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-surface-warm/40">
-                  <td className="py-3 px-3 font-mono font-bold text-ink-muted">
-                    {log.id}
-                  </td>
-                  <td className="py-3 px-3 font-mono text-[11px] text-ink-muted">
-                    {log.timestamp}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="font-bold text-ink">{log.actor}</span>
-                    <span className="text-[10px] text-ink-muted block uppercase">
-                      {log.role}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 font-mono font-black text-brand-cyan">
-                    {log.courseCode}
-                  </td>
-                  <td className="py-3 px-3 font-mono text-[11px] font-bold">
-                    {log.action}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span
-                      className={`tactile-tag text-[10px] py-0.5 px-2 font-black ${
-                        log.verdict === "VERIFIED" || log.verdict === "GROUNDED"
-                          ? "bg-brand-green/20 text-ink"
-                          : log.verdict === "BLOCKED_LOCKOUT"
-                          ? "bg-brand-coral text-white"
-                          : "bg-brand-yellow/30 text-ink"
-                      }`}
-                    >
-                      {log.verdict}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 font-mono text-[10px] text-ink-muted truncate max-w-[140px]" title={log.provenanceHash}>
-                    {log.provenanceHash.substring(0, 16)}...
-                  </td>
-                  <td className="py-3 px-3 text-ink-muted max-w-[280px]">
-                    {log.details}
-                  </td>
+        <p className="text-[11px] text-ink-muted">
+          Cryptographic SHA-256 digests computed over immutable attempt tuples <code>(attempt_id, student_id, question_id, score, timestamp)</code>. Proves mathematical grading provenance against post-submission manipulation.
+        </p>
+
+        {filteredLogs.length === 0 ? (
+          <div className="p-8 text-center text-ink-muted bg-surface rounded-friendly border-2 border-dashed border-ink/20">
+            <FileText className="w-8 h-8 mx-auto mb-2 text-ink-faint" />
+            <p className="font-bold text-xs">No attempt records recorded in the ledger yet.</p>
+            <p className="text-[11px] mt-1">Submit an answer in Student Practice mode to generate immutable provenance records.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead>
+                <tr className="border-b-2 border-ink/20 text-ink-muted font-bold">
+                  <th className="py-2.5 px-3">Log ID</th>
+                  <th className="py-2.5 px-3">Timestamp</th>
+                  <th className="py-2.5 px-3">Actor & Role</th>
+                  <th className="py-2.5 px-3">Course</th>
+                  <th className="py-2.5 px-3">Event Action</th>
+                  <th className="py-2.5 px-3">Verdict</th>
+                  <th className="py-2.5 px-3">Provenance Hash (SHA-256)</th>
+                  <th className="py-2.5 px-3">Audit Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-ink/10 font-medium text-ink">
+                {filteredLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-surface-warm/40">
+                    <td className="py-3 px-3 font-mono font-bold text-ink-muted">
+                      {log.id}
+                    </td>
+                    <td className="py-3 px-3 font-mono text-[11px] text-ink-muted">
+                      {log.timestamp}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="font-bold text-ink">{log.actor}</span>
+                      <span className="text-[10px] text-ink-muted block uppercase">
+                        {log.role}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-mono font-black text-brand-cyan">
+                      {log.courseCode}
+                    </td>
+                    <td className="py-3 px-3 font-mono text-[11px] font-bold">
+                      {log.action}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span
+                        className={`tactile-tag text-[10px] py-0.5 px-2 font-black ${
+                          log.verdict === "VERIFIED" || log.verdict === "GROUNDED"
+                            ? "bg-brand-green/20 text-ink"
+                            : log.verdict === "BLOCKED_LOCKOUT"
+                            ? "bg-brand-coral text-white"
+                            : "bg-brand-yellow/30 text-ink"
+                        }`}
+                      >
+                        {log.verdict}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-mono text-[10px] text-ink-muted truncate max-w-[140px]" title={log.provenanceHash}>
+                      {log.provenanceHash.substring(0, 16)}...
+                    </td>
+                    <td className="py-3 px-3 text-ink-muted max-w-[280px]">
+                      {log.details}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

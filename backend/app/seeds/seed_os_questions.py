@@ -198,6 +198,7 @@ SEED_OS_QUESTIONS_DATA: list[dict[str, Any]] = [
 
 async def seed_os_curriculum_and_questions(
     session: AsyncSession,
+    comprehensive: bool = False,
 ) -> tuple[Course, list[Question]]:
     """Seed CS301 Operating Systems course, topics, learning objectives, and question bank."""
     user_repo = UserRepository(session)
@@ -345,11 +346,14 @@ async def seed_os_curriculum_and_questions(
                         mime_type="text/markdown",
                     )
     except Exception:
-    try:
-        from app.seeds.seed_all_comprehensive_curriculum import seed_comprehensive_curriculum
-        await seed_comprehensive_curriculum(session)
-    except Exception:
         pass
+
+    if comprehensive:
+        try:
+            from app.seeds.seed_all_comprehensive_curriculum import seed_comprehensive_curriculum
+            await seed_comprehensive_curriculum(session)
+        except Exception:
+            pass
 
     return {
         "status": "success",
