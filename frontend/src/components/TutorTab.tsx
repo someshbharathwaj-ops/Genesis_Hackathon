@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { CourseResponse, TutorQueryResponse, UserResponse } from "../types";
 import { ApiError, recallApi } from "../lib/api-client";
+import { StructuredExplanation } from "./StructuredExplanation";
 
 interface TutorTabProps {
   course: CourseResponse | null;
@@ -212,10 +213,8 @@ export function TutorTab({
                 </div>
               ) : null}
 
-              {/* Explanatory Answer */}
-              <div className="p-4 bg-surface-warm/30 border border-ink/20 rounded-friendly-sm text-sm text-ink leading-relaxed font-medium">
-                {response.answer}
-              </div>
+              {/* Structured Pedagogical Explanation */}
+              <StructuredExplanation content={response.answer} />
 
               {/* Verified Citations List */}
               <div className="flex flex-col gap-2 pt-3 border-t border-ink/10">
