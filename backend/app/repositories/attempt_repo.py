@@ -74,3 +74,17 @@ class AttemptRepository(BaseRepository[Attempt]):
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_active_student_attempt(self, student_id: str) -> Attempt | None:
+        from app.models.attempt import AttemptStatus
+
+        stmt = (
+            select(Attempt)
+            .where(
+                Attempt.student_id == student_id,
+                Attempt.status == AttemptStatus.IN_PROGRESS,
+            )
+            .order_by(Attempt.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()

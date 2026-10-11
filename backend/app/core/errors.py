@@ -146,6 +146,46 @@ class DocumentEncryptedError(RecallException):
         )
 
 
+class ModelProviderError(RecallException):
+    def __init__(self, detail: str):
+        super().__init__(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            code="MODEL_PROVIDER_ERROR",
+            title="Model Provider Error",
+            detail=detail,
+        )
+
+
+class ModelTimeoutError(RecallException):
+    def __init__(self, timeout_seconds: float):
+        super().__init__(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            code="MODEL_TIMEOUT",
+            title="Model Inference Timeout",
+            detail=f"Language model inference exceeded timeout limit of {timeout_seconds:.1f}s.",
+        )
+
+
+class ModelUnavailableError(RecallException):
+    def __init__(self, model_name: str):
+        super().__init__(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            code="MODEL_UNAVAILABLE",
+            title="Model Service Unavailable",
+            detail=f"Configured model '{model_name}' is not reachable or not loaded.",
+        )
+
+
+class MalformedModelResponseError(RecallException):
+    def __init__(self, detail: str = "Invalid or empty response structure from model provider."):
+        super().__init__(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            code="MALFORMED_MODEL_RESPONSE",
+            title="Malformed Model Response",
+            detail=detail,
+        )
+
+
 async def recall_exception_handler(request: Request, exc: RecallException) -> JSONResponse:
     problem = ProblemDetails(
         type=exc.type_uri,

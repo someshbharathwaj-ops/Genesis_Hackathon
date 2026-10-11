@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     health,
     mastery,
     questions,
+    tutor,
     users,
 )
 
@@ -26,3 +27,4 @@ api_v1_router.include_router(attempts.router)
 api_v1_router.include_router(mastery.router)
 api_v1_router.include_router(diagnosis.router)
 api_v1_router.include_router(documents.router)
+api_v1_router.include_router(tutor.router)
