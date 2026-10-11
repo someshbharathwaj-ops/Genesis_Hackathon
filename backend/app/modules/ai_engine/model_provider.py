@@ -94,6 +94,64 @@ class DeterministicMockLanguageModelProvider(BaseLanguageModelProvider):
         citations = re.findall(r"\[Lecture:[^\]]+\]", prompt)
         citation_str = " ".join(dict.fromkeys(citations)) if citations else "[Course Notes]"
 
+        # Handle Revisor audit requests
+        if (
+            (system_prompt and "revisor" in system_prompt.lower())
+            or "instructions for audit report" in prompt.lower()
+        ):
+            cand_m = re.search(
+                r"CANDIDATE TEXT UNDER REVIEW:\s*(.*?)(?=\nINSTRUCTIONS|$)",
+                prompt,
+                re.DOTALL | re.IGNORECASE,
+            )
+            cand_text = cand_m.group(1).lower() if cand_m else prompt.lower()
+
+            if (
+                "quantum" in cand_text
+                or "6nf" in cand_text
+                or "hallucination" in cand_text
+                or "unsupported" in cand_text
+            ):
+                status_str = "UNGROUNDED_CLAIM_DETECTED"
+                summary_str = "Detected ungrounded assertions absent from provided course excerpts."
+                fi_str = (
+                    "- Candidate text references external concepts not substantiated by "
+                    "syllabus excerpts."
+                )
+            elif (
+                "contradiction" in cand_text
+                or "wrong" in cand_text
+                or "false" in cand_text
+            ):
+                status_str = "CONTRADICTION_DETECTED"
+                summary_str = "Candidate text directly contradicts official course materials."
+                fi_str = "- Candidate text states rules contrary to the provided lecture excerpts."
+            else:
+                status_str = "VERIFIED_GROUNDED"
+                summary_str = (
+                    "Candidate text is fully consistent with verified course excerpts "
+                    f"{citation_str}."
+                )
+                fi_str = "None"
+
+            text = (
+                f"STATUS: {status_str}\n"
+                f"SUMMARY: {summary_str}\n"
+                "VERIFIED POINTS:\n"
+                f"- Grounded assertions match course excerpts {citation_str}.\n"
+                "FLAGGED ISSUES:\n"
+                f"{fi_str}\n"
+                "SUGGESTED REVISION:\n"
+                f"Based on {citation_str}, concepts are verified as documented in lectures."
+            )
+            return ModelResponse(
+                text=text,
+                model_name=self.model_name,
+                prompt_tokens=max(1, len(prompt) // 4),
+                completion_tokens=max(1, len(text) // 4),
+                is_mock=True,
+            )
+
         # Generate a structured, syllabus-grounded pedagogical explanation
         if "armstrong" in prompt.lower() or "functional dependenc" in prompt.lower():
             text = (

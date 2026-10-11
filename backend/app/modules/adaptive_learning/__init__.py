@@ -30,6 +30,13 @@ from app.modules.adaptive_learning.mastery_engine import (
     MasteryState,
     ObjectiveMasteryProfile,
 )
+from app.modules.adaptive_learning.scheduling_engine import (
+    RetentionScheduleItem,
+    RetentionSessionPlan,
+    ReviewUrgency,
+    SchedulingEngine,
+    SpacedReviewQueue,
+)
 
 __all__ = [
     "DBMSDeterministicGrader",
@@ -55,4 +62,9 @@ __all__ = [
     "MisconceptionStatus",
     "PrerequisiteDiagnosticTrace",
     "SufficiencyStatus",
+    "SchedulingEngine",
+    "RetentionScheduleItem",
+    "SpacedReviewQueue",
+    "RetentionSessionPlan",
+    "ReviewUrgency",
 ]
