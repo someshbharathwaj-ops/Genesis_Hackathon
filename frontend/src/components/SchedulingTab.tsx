@@ -2,15 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import {
+  AlertCircle,
   Calendar,
   CheckCircle2,
   Clock,
   Hourglass,
   Lock,
   Play,
+  PlusCircle,
   RefreshCw,
   Sparkles,
   TrendingDown,
+  X,
 } from "lucide-react";
 import {
   CourseResponse,
@@ -25,12 +28,14 @@ interface SchedulingTabProps {
   course: CourseResponse | null;
   currentUser: UserResponse | null;
   onStartRetentionSession?: (plan: RetentionSessionPlanResponse) => void;
+  onPrepareWithTutor?: (assessment: ScheduledAssessmentResponse) => void;
 }
 
 export function SchedulingTab({
   course,
   currentUser,
   onStartRetentionSession,
+  onPrepareWithTutor,
 }: SchedulingTabProps) {
   const [queue, setQueue] = useState<ReviewQueueResponse | null>(null);
   const [courseAssessments, setCourseAssessments] = useState<ScheduledAssessmentResponse[]>([]);
@@ -40,6 +45,15 @@ export function SchedulingTab({
   // Retention Session Planning
   const [isPlanning, setIsPlanning] = useState<boolean>(false);
   const [plannedPlan, setPlannedPlan] = useState<RetentionSessionPlanResponse | null>(null);
+
+  // Self/Teacher Assessment Scheduling Modal State
+  const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
+  const [schedTitle, setSchedTitle] = useState<string>("");
+  const [schedDescription, setSchedDescription] = useState<string>("");
+  const [schedTime, setSchedTime] = useState<string>("");
+  const [schedDuration, setSchedDuration] = useState<number>(30);
+  const [isSubmittingSched, setIsSubmittingSched] = useState<boolean>(false);
+  const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
 
   const fetchQueue = async () => {
     if (!course || !currentUser) return;
@@ -73,6 +87,47 @@ export function SchedulingTab({
       alert(err instanceof Error ? err.message : "Failed to plan retention session.");
     } finally {
       setIsPlanning(false);
+    }
+  };
+
+  const handleOpenScheduleModal = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(14, 0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const defaultTimeStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+    setSchedTitle(`Practice Quiz: ${course?.code || "DBMS"} Mastery`);
+    setSchedDescription("Self-scheduled revision quiz covering key syllabus learning objectives.");
+    setSchedTime(defaultTimeStr);
+    setSchedDuration(30);
+    setShowScheduleModal(true);
+  };
+
+  const handleCreateSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!course || !currentUser || !schedTitle.trim() || !schedTime) return;
+
+    setIsSubmittingSched(true);
+    try {
+      const scheduledIso = new Date(schedTime).toISOString();
+      await recallApi.scheduleAssessment(course.id, {
+        title: schedTitle.trim(),
+        description: schedDescription.trim() || "",
+        scheduled_at: scheduledIso,
+        duration_minutes: Number(schedDuration),
+      });
+
+      // Refresh assessments list
+      const updatedAssessments = await recallApi.listCourseAssessments(course.id).catch(() => []);
+      setCourseAssessments(updatedAssessments);
+      setShowScheduleModal(false);
+      setScheduleSuccessMsg(`"${schedTitle.trim()}" successfully scheduled!`);
+      setTimeout(() => setScheduleSuccessMsg(null), 6000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to schedule assessment.");
+    } finally {
+      setIsSubmittingSched(false);
     }
   };
 
@@ -122,7 +177,7 @@ export function SchedulingTab({
 
       {/* Persisted Course Assessment Calendar (Quizzes & Tests) */}
       <section className="tactile-card p-6 bg-surface flex flex-col gap-4 border-2 border-ink shadow-hard">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-ink/10 pb-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-ink/10 pb-3">
           <div>
             <div className="flex items-center gap-2">
               <span className="tactile-tag bg-brand-coral text-white text-[10px] font-black uppercase">
@@ -133,21 +188,44 @@ export function SchedulingTab({
               </span>
             </div>
             <h3 className="text-lg font-black text-ink mt-0.5">
-              Teacher-Scheduled Quizzes &amp; Assessments
+              Teacher &amp; Student Scheduled Assessments
             </h3>
           </div>
-          <span className="text-xs font-bold text-ink-muted">
-            {courseAssessments.length} Scheduled Assessment{courseAssessments.length === 1 ? "" : "s"}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-ink-muted hidden sm:inline">
+              {courseAssessments.length} Scheduled Assessment{courseAssessments.length === 1 ? "" : "s"}
+            </span>
+            <button
+              onClick={handleOpenScheduleModal}
+              className="tactile-btn-cyan text-xs py-1.5 px-3 font-black flex items-center gap-1.5 shadow-hard-sm"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Schedule Quiz / Test</span>
+            </button>
+          </div>
         </div>
 
+        {scheduleSuccessMsg && (
+          <div className="p-3 bg-brand-green/20 border-2 border-brand-green rounded-friendly-sm flex items-center gap-2 text-xs font-bold text-ink animate-fade-in">
+            <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
+            <span>{scheduleSuccessMsg}</span>
+          </div>
+        )}
+
         {courseAssessments.length === 0 ? (
-          <div className="p-6 text-center text-ink-muted bg-surface-warm/40 border border-ink/10 rounded-friendly-sm">
-            <Clock className="w-6 h-6 mx-auto mb-1 text-ink-faint" />
-            <p className="text-xs font-bold">No upcoming quizzes scheduled yet by your instructor.</p>
-            <p className="text-[11px] font-medium text-ink-muted mt-0.5">
-              When instructors post an exam or test, it automatically appears here and alerts your notification center.
+          <div className="p-6 text-center text-ink-muted bg-surface-warm/40 border border-ink/10 rounded-friendly-sm flex flex-col items-center gap-2">
+            <Clock className="w-6 h-6 text-ink-faint" />
+            <p className="text-xs font-bold">No upcoming quizzes scheduled yet for this course.</p>
+            <p className="text-[11px] font-medium text-ink-muted">
+              Schedule your own practice quiz or wait for instructor milestones to appear here.
             </p>
+            <button
+              onClick={handleOpenScheduleModal}
+              className="tactile-btn-cyan text-xs py-1.5 px-3 font-black mt-2 flex items-center gap-1.5 shadow-hard-sm"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Schedule Practice Quiz Now</span>
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -177,14 +255,22 @@ export function SchedulingTab({
                     <span className="text-ink-muted block text-[10px]">SCHEDULED TIME</span>
                     {new Date(a.scheduled_at).toLocaleString()}
                   </div>
-                  {onStartRetentionSession && (
+                  {onPrepareWithTutor ? (
+                    <button
+                      onClick={() => onPrepareWithTutor(a)}
+                      className="tactile-btn-yellow text-xs py-1.5 px-3 font-black shrink-0 flex items-center gap-1.5 shadow-hard-sm hover:scale-[1.02] transition-transform"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Prepare Now</span>
+                    </button>
+                  ) : onStartRetentionSession ? (
                     <button
                       onClick={() => handlePlanRetentionSession()}
                       className="tactile-btn-yellow text-xs py-1 px-2.5 font-black shrink-0"
                     >
                       Prepare Now
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -381,6 +467,109 @@ export function SchedulingTab({
           )}
         </div>
       </div>
+
+      {/* Schedule Quiz/Test Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="tactile-card bg-surface w-full max-w-lg p-6 border-2 border-ink shadow-hard flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-ink/10 pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-brand-cyan" />
+                <h3 className="text-lg font-black text-ink">Schedule a Quiz or Test</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(false)}
+                className="p-1 hover:bg-surface-warm rounded border border-ink/10"
+              >
+                <X className="w-4 h-4 text-ink" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSchedule} className="flex flex-col gap-4 text-xs font-medium">
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-ink">Assessment Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={schedTitle}
+                  onChange={(e) => setSchedTitle(e.target.value)}
+                  placeholder="e.g. Normalization & Closures Mastery Quiz"
+                  className="tactile-input text-xs"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-ink">Description &amp; Syllabus Coverage (Optional)</label>
+                <textarea
+                  rows={3}
+                  value={schedDescription}
+                  onChange={(e) => setSchedDescription(e.target.value)}
+                  placeholder="e.g. Timed assessment covering 1NF, 2NF, 3NF decompositions and Armstrong axioms."
+                  className="tactile-input text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-ink">Scheduled Date &amp; Time *</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={schedTime}
+                    onChange={(e) => setSchedTime(e.target.value)}
+                    className="tactile-input text-xs"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-ink">Duration</label>
+                  <select
+                    value={schedDuration}
+                    onChange={(e) => setSchedDuration(Number(e.target.value))}
+                    className="tactile-input text-xs"
+                  >
+                    <option value={15}>15 Minutes</option>
+                    <option value={30}>30 Minutes</option>
+                    <option value={45}>45 Minutes</option>
+                    <option value={60}>60 Minutes</option>
+                    <option value={90}>90 Minutes</option>
+                    <option value={120}>120 Minutes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-ink/10 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleModal(false)}
+                  disabled={isSubmittingSched}
+                  className="tactile-btn-white text-xs py-2 px-3 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingSched || !schedTitle.trim() || !schedTime}
+                  className="tactile-btn-yellow text-xs py-2 px-4 font-black flex items-center gap-1.5"
+                >
+                  {isSubmittingSched ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Scheduling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Confirm &amp; Schedule</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

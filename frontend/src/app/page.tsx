@@ -68,6 +68,8 @@ export default function HomePage() {
   const [activeScoredAssessmentId, setActiveScoredAssessmentId] = useState<string | null>(null);
   const [targetObjectiveForPractice, setTargetObjectiveForPractice] =
     useState<LearningObjectiveResponse | null>(null);
+  const [tutorInitialQuery, setTutorInitialQuery] = useState<string | null>(null);
+  const [tutorAssessmentTitle, setTutorAssessmentTitle] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState<boolean>(false);
 
   // Initialize Platform
@@ -614,6 +616,12 @@ export default function HomePage() {
                 course={selectedCourse}
                 currentUser={currentUser}
                 hasActiveScoredAssessment={!!activeScoredAssessmentId}
+                initialQuery={tutorInitialQuery}
+                initialAssessmentTitle={tutorAssessmentTitle}
+                onClearInitialQuery={() => {
+                  setTutorInitialQuery(null);
+                  setTutorAssessmentTitle(null);
+                }}
               />
             )}
 
@@ -660,6 +668,15 @@ export default function HomePage() {
                 onStartRetentionSession={() => {
                   setMentorMode("revisor");
                   setActiveTab("revisor");
+                }}
+                onPrepareWithTutor={(assessment) => {
+                  const prompt = `I want to prepare for the upcoming assessment: "${assessment.title}". ${
+                    assessment.description ? `Coverage topics: ${assessment.description}. ` : ""
+                  }Please provide a comprehensive concept breakdown, key definitions, rules/formulas, common pitfalls to avoid, and step-by-step worked practice problems.`;
+                  setTutorInitialQuery(prompt);
+                  setTutorAssessmentTitle(assessment.title);
+                  setMentorMode("tutor");
+                  setActiveTab("tutor");
                 }}
               />
             )}
