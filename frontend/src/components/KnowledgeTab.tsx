@@ -304,7 +304,7 @@ export function KnowledgeTab({ course }: KnowledgeTabProps) {
                   <Layers className="w-4 h-4 text-brand-cyan" />
                   <span>Extracted Semantic Chunks ({docDetail.chunks.length})</span>
                 </h4>
-                <span className="text-xs text-ink-muted font-bold">{docDetail.document.filename}</span>
+                <span className="text-xs text-ink-muted font-bold">{docDetail.filename || docDetail.document?.filename || "Document"}</span>
               </div>
 
               <div className="flex flex-col gap-3 max-h-[360px] overflow-y-auto pr-1">

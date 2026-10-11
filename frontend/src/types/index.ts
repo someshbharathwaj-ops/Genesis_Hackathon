@@ -177,8 +177,9 @@ export interface CourseDocumentResponse {
   created_at: string;
 }
 
-export interface CourseDocumentDetailResponse {
-  document: CourseDocumentResponse;
+export interface CourseDocumentDetailResponse extends Partial<CourseDocumentResponse> {
+  document?: CourseDocumentResponse;
+  filename?: string;
   chunks: DocumentChunkResponse[];
 }
 
