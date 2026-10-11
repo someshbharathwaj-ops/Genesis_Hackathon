@@ -3,7 +3,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user, verify_course_access, verify_student_ownership
 from app.core.database import get_db
+from app.models.identity import User
 from app.schemas.revisor import RevisorReviewRequest, RevisorReviewResponse
 from app.services.revisor_service import RevisorService
 
@@ -22,8 +24,11 @@ router = APIRouter(prefix="/courses/{course_id}/revisor", tags=["Revisor"])
 async def review_candidate_text(
     course_id: str,
     payload: RevisorReviewRequest,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> RevisorReviewResponse:
+    verify_student_ownership(current_user, payload.student_id)
+    await verify_course_access(course_id, current_user, session)
     service = RevisorService(session)
     return await service.review_explanation(
         course_id=course_id,

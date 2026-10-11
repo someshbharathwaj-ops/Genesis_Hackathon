@@ -3,36 +3,37 @@
 import pytest
 from httpx import AsyncClient
 
+from tests.auth_utils import create_authenticated_user
+
 
 @pytest.mark.integration
 async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: AsyncClient) -> None:
-    # 1. Seed DBMS curriculum & verified question bank
-    seed_resp = await async_client.post("/api/v1/courses/seed/dbms")
+    # 1. Seed DBMS curriculum & verified question bank via instructor
+    _, inst_hdr = await create_authenticated_user(
+        async_client, "inst.phase3@recall.edu", "Prof DBMS", "instructor"
+    )
+    seed_resp = await async_client.post("/api/v1/courses/seed/dbms", headers=inst_hdr)
     assert seed_resp.status_code == 201
     course_id = seed_resp.json()["course_id"]
 
     # 2. Register student
-    student_resp = await async_client.post(
-        "/api/v1/users",
-        json={
-            "email": "student.phase3@recall.edu",
-            "full_name": "Alan Turing",
-            "role": "student",
-        },
+    student_data, student_hdr = await create_authenticated_user(
+        async_client, "student.phase3@recall.edu", "Alan Turing", "student"
     )
-    assert student_resp.status_code == 201
-    student_id = student_resp.json()["id"]
+    student_id = student_data["id"]
 
     # Enroll student in course
     enroll_resp = await async_client.post(
         f"/api/v1/courses/{course_id}/enroll",
         json={"user_id": student_id, "course_id": course_id},
+        headers=student_hdr,
     )
     assert enroll_resp.status_code == 201
 
     # 3. Query initial course diagnosis (all objectives UNTESTED)
     init_diag_resp = await async_client.get(
-        f"/api/v1/diagnosis/student/{student_id}/course/{course_id}"
+        f"/api/v1/diagnosis/student/{student_id}/course/{course_id}",
+        headers=student_hdr,
     )
     assert init_diag_resp.status_code == 200
     init_data = init_diag_resp.json()
@@ -48,7 +49,8 @@ async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: Asy
 
     # 4. Query initial objective diagnosis for LO_CLOSURE
     closure_init_resp = await async_client.get(
-        f"/api/v1/diagnosis/student/{student_id}/objective/{closure_obj['objective_id']}"
+        f"/api/v1/diagnosis/student/{student_id}/objective/{closure_obj['objective_id']}",
+        headers=student_hdr,
     )
     assert closure_init_resp.status_code == 200
     closure_init = closure_init_resp.json()
@@ -67,7 +69,6 @@ async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: Asy
     q2_id = closure_questions[1]["id"]
 
     # 6. Single failure test (Rule 2: Non-Catastrophic Diagnosis)
-    # Student submits incorrect answer with missing attributes
     fail_1_resp = await async_client.post(
         "/api/v1/attempts",
         json={
@@ -77,12 +78,13 @@ async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: Asy
             "is_hint_assisted": False,
             "assessment_context": "diagnostic",
         },
-        headers={"Idempotency-Key": "phase3_idem_fail1"},
+        headers={"Idempotency-Key": "phase3_idem_fail1", **student_hdr},
     )
     assert fail_1_resp.status_code == 201
 
     diag_after_single_fail_resp = await async_client.get(
-        f"/api/v1/diagnosis/student/{student_id}/objective/{closure_obj['objective_id']}"
+        f"/api/v1/diagnosis/student/{student_id}/objective/{closure_obj['objective_id']}",
+        headers=student_hdr,
     )
     assert diag_after_single_fail_resp.status_code == 200
     single_fail_diag = diag_after_single_fail_resp.json()
@@ -100,7 +102,6 @@ async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: Asy
     assert single_fail_diag["recommended_action"] == "recommend_diagnostic_probe"
 
     # 7. Second distinct failure test -> transitions to demonstrated_weakness
-    # and confirmed misconception
     fail_2_resp = await async_client.post(
         "/api/v1/attempts",
         json={
@@ -110,12 +111,13 @@ async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: Asy
             "is_hint_assisted": False,
             "assessment_context": "diagnostic",
         },
-        headers={"Idempotency-Key": "phase3_idem_fail2"},
+        headers={"Idempotency-Key": "phase3_idem_fail2", **student_hdr},
     )
     assert fail_2_resp.status_code == 201
 
     diag_after_two_fails_resp = await async_client.get(
-        f"/api/v1/diagnosis/student/{student_id}/objective/{closure_obj['objective_id']}"
+        f"/api/v1/diagnosis/student/{student_id}/objective/{closure_obj['objective_id']}",
+        headers=student_hdr,
     )
     assert diag_after_two_fails_resp.status_code == 200
     two_fails_diag = diag_after_two_fails_resp.json()
@@ -128,9 +130,9 @@ async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: Asy
     assert two_fails_diag["confirmed_misconceptions"][0]["status"] == "confirmed_misconception"
 
     # 8. Check prerequisite attribution for child objective LO_KEYS
-    # LO_KEYS has prerequisite LO_CLOSURE.
     keys_diag_resp = await async_client.get(
-        f"/api/v1/diagnosis/student/{student_id}/objective/{keys_obj['objective_id']}"
+        f"/api/v1/diagnosis/student/{student_id}/objective/{keys_obj['objective_id']}",
+        headers=student_hdr,
     )
     assert keys_diag_resp.status_code == 200
     keys_diag = keys_diag_resp.json()
@@ -149,6 +151,7 @@ async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: Asy
             "course_id": course_id,
             "target_objective_id": keys_obj["objective_id"],
         },
+        headers=student_hdr,
     )
     assert session_plan_resp.status_code == 200
     plan_data = session_plan_resp.json()
@@ -156,25 +159,30 @@ async def test_phase3_evidence_and_bounded_diagnosis_lifecycle(async_client: Asy
     assert len(plan_data["recommended_questions"]) <= 5
     assert len(plan_data["recommended_questions"]) > 0
 
-    # Prerequisite probe should be prioritized
     first_q = plan_data["recommended_questions"][0]
     assert "Prerequisite" in first_q["priority_reason"] or "LO_CLOSURE" in first_q["objective_code"]
 
-    # 10. Negative tests: non-existent resource lookups
+    # 10. Negative tests: non-existent resource lookups using admin credentials
+    _, admin_hdr = await create_authenticated_user(
+        async_client, "admin.phase3@recall.edu", "System Admin", "admin"
+    )
     bad_student_resp = await async_client.get(
-        f"/api/v1/diagnosis/student/bad_id/course/{course_id}"
+        f"/api/v1/diagnosis/student/bad_id/course/{course_id}",
+        headers=admin_hdr,
     )
     assert bad_student_resp.status_code == 404
     assert bad_student_resp.json()["code"] == "RESOURCE_NOT_FOUND"
 
     bad_course_resp = await async_client.get(
-        f"/api/v1/diagnosis/student/{student_id}/course/bad_course_id"
+        f"/api/v1/diagnosis/student/{student_id}/course/bad_course_id",
+        headers=admin_hdr,
     )
     assert bad_course_resp.status_code == 404
     assert bad_course_resp.json()["code"] == "RESOURCE_NOT_FOUND"
 
     bad_obj_resp = await async_client.get(
-        f"/api/v1/diagnosis/student/{student_id}/objective/bad_obj_id"
+        f"/api/v1/diagnosis/student/{student_id}/objective/bad_obj_id",
+        headers=admin_hdr,
     )
     assert bad_obj_resp.status_code == 404
     assert bad_obj_resp.json()["code"] == "RESOURCE_NOT_FOUND"

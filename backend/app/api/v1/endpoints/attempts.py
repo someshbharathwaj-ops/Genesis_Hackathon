@@ -3,8 +3,10 @@
 from fastapi import APIRouter, Depends, Header, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user, verify_student_ownership
 from app.core.database import get_db
 from app.core.errors import ResourceNotFoundError
+from app.models.identity import User
 from app.repositories.attempt_repo import AttemptRepository
 from app.schemas.attempt import AttemptCreate, AttemptResponse
 from app.services.attempt_service import AttemptService
@@ -17,8 +19,10 @@ async def submit_attempt(
     payload: AttemptCreate,
     response: Response,
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> AttemptResponse:
+    verify_student_ownership(current_user, payload.student_id)
     service = AttemptService(db)
     attempt, is_replayed = await service.submit_attempt(
         student_id=payload.student_id,
@@ -40,11 +44,16 @@ async def submit_attempt(
 
 
 @router.get("/{attempt_id}", response_model=AttemptResponse)
-async def get_attempt(attempt_id: str, db: AsyncSession = Depends(get_db)) -> AttemptResponse:
+async def get_attempt(
+    attempt_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AttemptResponse:
     repo = AttemptRepository(db)
     attempt = await repo.get_by_id(attempt_id)
     if not attempt:
         raise ResourceNotFoundError("Attempt", attempt_id)
+    verify_student_ownership(current_user, attempt.student_id)
     return AttemptResponse.model_validate(attempt)
 
 
@@ -53,8 +62,10 @@ async def list_student_attempts(
     student_id: str,
     limit: int = 50,
     offset: int = 0,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[AttemptResponse]:
+    verify_student_ownership(current_user, student_id)
     repo = AttemptRepository(db)
     attempts = await repo.list_student_attempts(student_id, limit=limit, offset=offset)
     return [AttemptResponse.model_validate(a) for a in attempts]

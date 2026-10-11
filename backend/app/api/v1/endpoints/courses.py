@@ -3,10 +3,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user, require_instructor_or_admin
 from app.core.database import get_db
 from app.core.errors import RecallException, ResourceNotFoundError
 from app.models.curriculum import LearningObjective, Topic
-from app.models.identity import Course, CourseEnrollment
+from app.models.identity import Course, CourseEnrollment, User, UserRole
 from app.repositories.course_repo import (
     CourseRepository,
     LearningObjectiveRepository,
@@ -155,8 +156,19 @@ async def create_objective(
     status_code=status.HTTP_201_CREATED,
 )
 async def enroll_student(
-    course_id: str, payload: EnrollmentCreate, db: AsyncSession = Depends(get_db)
+    course_id: str,
+    payload: EnrollmentCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> EnrollmentResponse:
+    if current_user.role == UserRole.STUDENT and current_user.id != payload.user_id:
+        raise RecallException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="FORBIDDEN",
+            title="Cannot Enroll Other Users",
+            detail="Students may only enroll themselves in courses.",
+        )
+
     course_repo = CourseRepository(db)
     course = await course_repo.get_by_id(course_id)
     if not course:
@@ -182,7 +194,11 @@ async def enroll_student(
 
 
 @router.post("/seed/dbms", status_code=status.HTTP_201_CREATED)
-async def seed_dbms_course(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+async def seed_dbms_course(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    require_instructor_or_admin(current_user)
     from app.seeds.seed_dbms_questions import seed_dbms_curriculum_and_questions
 
     result = await seed_dbms_curriculum_and_questions(db)

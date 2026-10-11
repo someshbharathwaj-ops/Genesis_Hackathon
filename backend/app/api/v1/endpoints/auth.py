@@ -19,32 +19,16 @@ router = APIRouter(prefix="/auth", tags=["Authentication & Identity"])
 
 @router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    """Authenticate an existing user by email and issue a signed Bearer token."""
-    repo = UserRepository(db)
-    user = await repo.get_by_email(payload.email)
-    if not user:
-        raise ResourceNotFoundError("User with email", payload.email)
-
-    if not user.is_active:
-        raise RecallException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            code="FORBIDDEN",
-            title="User Inactive",
-            detail=f"Account '{payload.email}' is currently inactive.",
-        )
-
-    token = create_access_token(
-        user_id=user.id,
-        email=user.email,
-        role=user.role.value,
-        expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
-    )
-
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=UserResponse.model_validate(user),
+    """Passwordless email-only authentication is disabled to prevent privilege escalation."""
+    raise RecallException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        code="AUTHENTICATION_DISABLED",
+        title="Passwordless Login Disabled",
+        detail=(
+            "Passwordless email-only authentication is disabled to prevent unverified "
+            "privilege escalation. In development or demo environments, use "
+            "/api/v1/auth/demo-login."
+        ),
     )
 
 
@@ -55,7 +39,16 @@ async def demo_login(
     """Quick demo login for students or instructors.
 
     Ensures the user and DBMS course enrollment exist for a seamless hackathon demo.
+    Restricted to non-production environments.
     """
+    if settings.ENVIRONMENT.lower() == "production":
+        raise RecallException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="DEMO_LOGIN_DISABLED",
+            title="Demo Login Forbidden",
+            detail="Demo login is strictly disabled in production environments.",
+        )
+
     user_repo = UserRepository(db)
     course_repo = CourseRepository(db)
     enroll_repo = EnrollmentRepository(db)

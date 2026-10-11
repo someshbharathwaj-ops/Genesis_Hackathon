@@ -4,31 +4,39 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tests.auth_utils import create_authenticated_user
+
 
 @pytest.mark.integration
 async def test_phase6_scheduling_api_lifecycle(
     async_client: AsyncClient,
     test_db_session: AsyncSession,
 ) -> None:
-    # 1. Seed course and create student
-    seed_resp = await async_client.post("/api/v1/courses/seed/dbms")
+    # 0. Setup admin and student
+    admin_user, admin_hdr = await create_authenticated_user(
+        async_client, "admin@recall.edu", "Admin User", "admin"
+    )
+    student_user, student_hdr = await create_authenticated_user(
+        async_client, "sched_student@university.edu", "Scheduling Student", "student"
+    )
+    student_id = student_user["id"]
+
+    # 1. Seed course and enroll student
+    seed_resp = await async_client.post("/api/v1/courses/seed/dbms", headers=admin_hdr)
     assert seed_resp.status_code == 201
     course_id = seed_resp.json()["course_id"]
 
-    user_resp = await async_client.post(
-        "/api/v1/users",
-        json={
-            "email": "sched_student@university.edu",
-            "full_name": "Scheduling Student",
-            "role": "student",
-        },
+    enroll_resp = await async_client.post(
+        f"/api/v1/courses/{course_id}/enroll",
+        json={"user_id": student_id, "course_id": course_id},
+        headers=admin_hdr,
     )
-    assert user_resp.status_code == 201
-    student_id = user_resp.json()["id"]
+    assert enroll_resp.status_code in (200, 201)
 
     # 2. Get initial review queue (all objectives untested)
     queue_resp = await async_client.get(
-        f"/api/v1/courses/{course_id}/scheduling/student/{student_id}/review-queue"
+        f"/api/v1/courses/{course_id}/scheduling/student/{student_id}/review-queue",
+        headers=student_hdr,
     )
     assert queue_resp.status_code == 200
     queue_data = queue_resp.json()
@@ -44,6 +52,7 @@ async def test_phase6_scheduling_api_lifecycle(
     questions = q_resp.json()
     assert len(questions) > 0
     target_q = questions[0]
+    att_headers = {**student_hdr, "Idempotency-Key": "idem-sched-att-1"}
     att_resp = await async_client.post(
         "/api/v1/attempts",
         json={
@@ -55,14 +64,15 @@ async def test_phase6_scheduling_api_lifecycle(
             "time_spent_ms": 15000,
             "assessment_context": "diagnostic",
         },
-        headers={"Idempotency-Key": "idem-sched-att-1"},
+        headers=att_headers,
     )
     assert att_resp.status_code == 201
 
     # 4. Check Review Queue: Rule 6 Working Memory Lockout Active
     # An attempt made just now must be in working memory (< 3600s)
     queue2_resp = await async_client.get(
-        f"/api/v1/courses/{course_id}/scheduling/student/{student_id}/review-queue"
+        f"/api/v1/courses/{course_id}/scheduling/student/{student_id}/review-queue",
+        headers=student_hdr,
     )
     assert queue2_resp.status_code == 200
     queue2_data = queue2_resp.json()
@@ -78,6 +88,7 @@ async def test_phase6_scheduling_api_lifecycle(
     plan_resp = await async_client.post(
         f"/api/v1/courses/{course_id}/scheduling/student/{student_id}/plan-session",
         json={"max_items": 5},
+        headers=student_hdr,
     )
     assert plan_resp.status_code == 200
     plan_data = plan_resp.json()
@@ -89,6 +100,7 @@ async def test_phase6_scheduling_api_lifecycle(
     queue_unlocked_resp = await async_client.get(
         f"/api/v1/courses/{course_id}/scheduling/student/{student_id}/review-queue",
         params={"cooldown_seconds": 0.0},
+        headers=student_hdr,
     )
     assert queue_unlocked_resp.status_code == 200
     queue_unlocked_data = queue_unlocked_resp.json()
@@ -100,11 +112,13 @@ async def test_phase6_scheduling_api_lifecycle(
 
     # 7. Invalid course / user 404 checks
     bad_course_resp = await async_client.get(
-        f"/api/v1/courses/non-existent-course-id/scheduling/student/{student_id}/review-queue"
+        f"/api/v1/courses/non-existent-course-id/scheduling/student/{student_id}/review-queue",
+        headers=student_hdr,
     )
     assert bad_course_resp.status_code == 404
 
     bad_user_resp = await async_client.get(
-        f"/api/v1/courses/{course_id}/scheduling/student/non-existent-user-id/review-queue"
+        f"/api/v1/courses/{course_id}/scheduling/student/non-existent-user-id/review-queue",
+        headers=admin_hdr,
     )
     assert bad_user_resp.status_code == 404

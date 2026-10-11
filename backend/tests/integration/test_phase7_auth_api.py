@@ -51,13 +51,13 @@ async def test_auth_api_lifecycle_and_security(
     assert me_data["user"]["id"] == student_id
     assert len(me_data["enrolled_course_ids"]) >= 1
 
-    # 5. Regular email login for the existing student
+    # 5. Passwordless email login is disabled to prevent privilege escalation (returns 501)
     login_resp = await async_client.post(
         "/api/v1/auth/login",
         json={"email": "student.ada@recall.edu"},
     )
-    assert login_resp.status_code == 200
-    assert login_resp.json()["user"]["id"] == student_id
+    assert login_resp.status_code == 501
+    assert login_resp.json()["code"] == "AUTHENTICATION_DISABLED"
 
     # 6. Demo login for Instructor (Prof. E. F. Codd)
     demo_inst_resp = await async_client.post(
@@ -69,10 +69,10 @@ async def test_auth_api_lifecycle_and_security(
     assert inst_data["user"]["email"] == "instructor.dbms@recall.edu"
     assert inst_data["user"]["role"] == "instructor"
 
-    # 7. Non-existent email login should return 404
+    # 7. Non-existent email login also fails closed with 501
     non_existent_resp = await async_client.post(
         "/api/v1/auth/login",
         json={"email": "ghost@recall.edu"},
     )
-    assert non_existent_resp.status_code == 404
-    assert non_existent_resp.json()["code"] == "RESOURCE_NOT_FOUND"
+    assert non_existent_resp.status_code == 501
+    assert non_existent_resp.json()["code"] == "AUTHENTICATION_DISABLED"

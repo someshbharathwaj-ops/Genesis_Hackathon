@@ -3,7 +3,13 @@
 from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import (
+    get_current_user,
+    verify_course_access,
+    verify_instructor_course_access,
+)
 from app.core.database import get_db
+from app.models.identity import User
 from app.schemas.document import (
     CourseDocumentDetailResponse,
     CourseDocumentResponse,
@@ -23,9 +29,11 @@ router = APIRouter(prefix="/courses", tags=["Knowledge Engine & Document Ingesti
 async def upload_course_document(
     course_id: str,
     file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CourseDocumentResponse:
     """Upload and ingest a course material document (PDF or TXT) with repeat-safety."""
+    await verify_instructor_course_access(course_id, current_user, db)
     service = KnowledgeService(db)
     file_bytes = await file.read()
     filename = file.filename or "uploaded_document.pdf"
@@ -45,9 +53,11 @@ async def upload_course_document(
 )
 async def list_course_documents(
     course_id: str,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[CourseDocumentResponse]:
     """List all ingested documents for a specific course."""
+    await verify_course_access(course_id, current_user, db)
     service = KnowledgeService(db)
     return await service.list_course_documents(course_id=course_id)
 
@@ -59,9 +69,11 @@ async def list_course_documents(
 async def get_course_document_detail(
     course_id: str,
     document_id: str,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CourseDocumentDetailResponse:
     """Retrieve full document metadata and extracted semantic chunks with page provenance."""
+    await verify_course_access(course_id, current_user, db)
     service = KnowledgeService(db)
     return await service.get_document_detail(course_id=course_id, document_id=document_id)
 
@@ -73,9 +85,11 @@ async def get_course_document_detail(
 async def delete_course_document(
     course_id: str,
     document_id: str,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a course document and all its indexed chunks."""
+    await verify_instructor_course_access(course_id, current_user, db)
     service = KnowledgeService(db)
     await service.delete_document(course_id=course_id, document_id=document_id)
 
@@ -87,9 +101,11 @@ async def delete_course_document(
 async def retrieve_course_knowledge(
     course_id: str,
     payload: RetrievalQueryRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> RetrievalResponse:
     """Execute tenant-isolated semantic vector retrieval against course lecture chunks."""
+    await verify_course_access(course_id, current_user, db)
     service = KnowledgeService(db)
     return await service.retrieve_knowledge(
         course_id=course_id,
