@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.curriculum import LearningObjective, Topic
-from app.models.identity import Course, User, UserRole
+from app.models.identity import Course, CourseEnrollment, User, UserRole
 from app.models.question import (
     DifficultyLevel,
     Question,
@@ -35,7 +35,7 @@ from app.repositories.question_repo import (
     QuestionVersionRepository,
     calculate_provenance_hash,
 )
-from app.repositories.user_repo import UserRepository
+from app.repositories.user_repo import EnrollmentRepository, UserRepository
 
 SEED_QUESTIONS_DATA: list[dict[str, Any]] = [
     # --- LO_CLOSURE ---
@@ -311,7 +311,27 @@ async def seed_dbms_curriculum_and_questions(session: AsyncSession) -> dict[str,
         )
         await course_repo.create(course)
 
-    # 3. Topic
+    # 3. Demo Student and Course Enrollment
+    student = await user_repo.get_by_email("student.ada@recall.edu")
+    if not student:
+        student = User(
+            email="student.ada@recall.edu",
+            full_name="Ada Lovelace",
+            role=UserRole.STUDENT,
+        )
+        await user_repo.create(student)
+
+    enroll_repo = EnrollmentRepository(session)
+    existing_enrollment = await enroll_repo.get_enrollment(student.id, course.id)
+    if not existing_enrollment:
+        enrollment = CourseEnrollment(
+            user_id=student.id,
+            course_id=course.id,
+            is_active=True,
+        )
+        await enroll_repo.create(enrollment)
+
+    # 4. Topic
     topic_repo = TopicRepository(session)
     topics = await topic_repo.list_by_course(course.id)
     topic = next((t for t in topics if t.code == "FD_NORM"), None)

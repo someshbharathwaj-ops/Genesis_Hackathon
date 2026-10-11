@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     attempts,
+    auth,
     courses,
     diagnosis,
     documents,
@@ -20,6 +21,9 @@ api_v1_router = APIRouter()
 
 # Health & readiness
 api_v1_router.include_router(health.router)
+
+# Authentication & identity
+api_v1_router.include_router(auth.router)
 
 # Domain engine endpoints
 api_v1_router.include_router(users.router)

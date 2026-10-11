@@ -1,181 +1,345 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Activity, BookOpen, Brain, CheckCircle2, Cpu, Database, ShieldAlert, Sparkles } from "lucide-react";
-import { recallApi } from "@/lib/api-client";
-import { HealthResponse, ReadinessResponse } from "@/types";
+import {
+  BookOpen,
+  Brain,
+  Calendar,
+  Compass,
+  FileCheck2,
+  FileText,
+  HelpCircle,
+  Layers,
+  MessageSquare,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import {
+  clearStoredToken,
+  getStoredToken,
+  recallApi,
+  setStoredToken,
+} from "../lib/api-client";
+import {
+  CourseResponse,
+  DiagnosticSessionPlanResponse,
+  HealthResponse,
+  LearningObjectiveResponse,
+  ReadinessResponse,
+  RetentionSessionPlanResponse,
+  TopicResponse,
+  UserResponse,
+} from "../types";
+import { CurriculumTab } from "../components/CurriculumTab";
+import { KnowledgeTab } from "../components/KnowledgeTab";
+import { MasteryDiagnosisTab } from "../components/MasteryDiagnosisTab";
+import { Navbar } from "../components/Navbar";
+import { PracticeTab } from "../components/PracticeTab";
+import { RevisorTab } from "../components/RevisorTab";
+import { SchedulingTab } from "../components/SchedulingTab";
+import { TutorTab } from "../components/TutorTab";
+
+type ActiveTab =
+  | "curriculum"
+  | "mastery"
+  | "knowledge"
+  | "practice"
+  | "tutor"
+  | "revisor"
+  | "scheduling";
 
 export default function HomePage() {
+  // Global Platform State
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [readiness, setReadiness] = useState<ReadinessResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
+  const [courses, setCourses] = useState<CourseResponse[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<CourseResponse | null>(null);
+  const [topics, setTopics] = useState<TopicResponse[]>([]);
+
+  // Navigation State
+  const [activeTab, setActiveTab] = useState<ActiveTab>("curriculum");
+  const [isSeeding, setIsSeeding] = useState<boolean>(false);
+  const [activeScoredAssessmentId, setActiveScoredAssessmentId] = useState<string | null>(null);
+  const [targetObjectiveForPractice, setTargetObjectiveForPractice] =
+    useState<LearningObjectiveResponse | null>(null);
+
+  // Initialize Auth & Data
+  const initializePlatform = async () => {
+    try {
+      const [healthData, readyData] = await Promise.all([
+        recallApi.getHealth().catch(() => null),
+        recallApi.getReadiness().catch(() => null),
+      ]);
+      if (healthData) setHealth(healthData);
+      if (readyData) setReadiness(readyData);
+
+      // Check current token
+      const token = getStoredToken();
+      if (token) {
+        try {
+          const me = await recallApi.getMe();
+          setCurrentUser(me.user);
+        } catch {
+          clearStoredToken();
+          setCurrentUser(null);
+        }
+      }
+
+      // Fetch Courses
+      let courseList = await recallApi.listCourses().catch(() => []);
+      if (courseList.length === 0) {
+        // Auto-seed DBMS course if empty catalog
+        try {
+          await recallApi.seedDbmsCourse();
+          courseList = await recallApi.listCourses();
+        } catch {
+          courseList = [];
+        }
+      }
+      setCourses(courseList);
+
+      if (courseList.length > 0) {
+        const primary = courseList[0];
+        setSelectedCourse(primary);
+        const topList = await recallApi.getCourseTopics(primary.id).catch(() => []);
+        setTopics(topList);
+      }
+
+      // If no user is logged in, perform seamless demo student login
+      if (!token) {
+        try {
+          const demoResp = await recallApi.demoLogin("student", "CS340");
+          setStoredToken(demoResp.access_token);
+          setCurrentUser(demoResp.user);
+        } catch {
+          // ignore offline probe
+        }
+      }
+    } catch (err) {
+      console.error("Initialization error:", err);
+    }
+  };
 
   useEffect(() => {
-    async function checkStatus() {
-      try {
-        const [healthData, readyData] = await Promise.all([
-          recallApi.getHealth(),
-          recallApi.getReadiness(),
-        ]);
-        setHealth(healthData);
-        setReadiness(readyData);
-      } catch {
-        // Fallback probe for isolated client preview
-        setHealth({ status: "ok", environment: "development", version: "0.1.0" });
-        setReadiness({
-          status: "ready",
-          engines: {
-            adaptive_learning_engine: "operational",
-            knowledge_engine: "operational",
-            ai_execution_engine: "operational",
-            configuration: "valid",
-          },
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-    checkStatus();
+    initializePlatform();
   }, []);
 
+  // Course Selection Change Handler
+  const handleSelectCourse = async (course: CourseResponse) => {
+    setSelectedCourse(course);
+    try {
+      const topList = await recallApi.getCourseTopics(course.id);
+      setTopics(topList);
+    } catch {
+      setTopics([]);
+    }
+  };
+
+  // Demo Login Handler
+  const handleDemoLogin = async (role: "student" | "instructor") => {
+    try {
+      const resp = await recallApi.demoLogin(role, selectedCourse?.code || "CS340");
+      setStoredToken(resp.access_token);
+      setCurrentUser(resp.user);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to switch demo identity.");
+    }
+  };
+
+  // Logout Handler
+  const handleLogout = () => {
+    clearStoredToken();
+    setCurrentUser(null);
+  };
+
+  // Seed DBMS Handler
+  const handleSeedCourse = async () => {
+    setIsSeeding(true);
+    try {
+      await recallApi.seedDbmsCourse();
+      const courseList = await recallApi.listCourses();
+      setCourses(courseList);
+      if (courseList.length > 0) {
+        handleSelectCourse(courseList[0]);
+      }
+      alert("Successfully seeded CS340 DBMS curriculum and verified question bank!");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to seed course.");
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-background text-ink px-6 py-12 md:py-16 max-w-7xl mx-auto flex flex-col gap-10">
-      {/* Platform Header */}
-      <header className="flex flex-col gap-4 items-start">
-        <div className="tactile-tag bg-brand-yellow text-ink">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>PHASE 0 ARCHITECTURAL FOUNDATION</span>
-        </div>
-        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-ink">
-          Recall Master Platform
-        </h1>
-        <p className="text-ink-muted max-w-3xl text-base md:text-lg font-medium leading-relaxed">
-          Course-aware adaptive learning with deterministic authority over grading, diagnostic routing,
-          and mastery estimation. AI remediation bounded strictly to verified lecture slides.
-        </p>
-      </header>
+    <div className="min-h-screen bg-background text-ink flex flex-col">
+      {/* Top Navigation & Identity Bar */}
+      <div className="max-w-7xl mx-auto w-full px-4 pt-6 md:pt-8">
+        <Navbar
+          currentUser={currentUser}
+          courses={courses}
+          selectedCourse={selectedCourse}
+          onSelectCourse={handleSelectCourse}
+          onLoginDemo={handleDemoLogin}
+          onLogout={handleLogout}
+          onSeedCourse={handleSeedCourse}
+          isSeeding={isSeeding}
+          hasActiveScoredAssessment={!!activeScoredAssessmentId}
+        />
+      </div>
 
-      {/* Engine Status Grid */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Adaptive Learning Engine */}
-        <div className="tactile-card p-6 flex flex-col justify-between gap-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 rounded-friendly-sm bg-brand-yellow border-2 border-ink shadow-hard-sm flex items-center justify-center">
-                <Brain className="w-6 h-6 text-ink" />
-              </div>
-              <span className="tactile-tag bg-brand-green text-ink">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{readiness?.engines.adaptive_learning_engine || "Operational"}</span>
-              </span>
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-ink">Adaptive Learning Engine</h2>
-              <p className="text-sm text-ink-muted mt-2 font-medium">
-                Deterministic mastery calculations, decoupled confidence tracking, diagnostic sequencing, and remediation routing.
-              </p>
-            </div>
-          </div>
-          <div className="text-xs space-y-2 pt-4 border-t-2 border-ink/10">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-ink-muted">Grading Authority:</span>
-              <span className="font-mono font-bold text-ink bg-surface-muted px-2 py-0.5 rounded border border-ink/20">Pure Code</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-ink-muted">Attempt Audit:</span>
-              <span className="font-mono font-bold text-ink bg-surface-muted px-2 py-0.5 rounded border border-ink/20">Immutable</span>
-            </div>
-          </div>
-        </div>
+      {/* Main Tabbed Navigation */}
+      <div className="max-w-7xl mx-auto w-full px-4 py-6">
+        <nav className="flex flex-wrap items-center gap-2 pb-4 border-b-2 border-ink/10">
+          <button
+            onClick={() => setActiveTab("curriculum")}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "curriculum" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Curriculum & Overview</span>
+          </button>
 
-        {/* Knowledge Engine */}
-        <div className="tactile-card p-6 flex flex-col justify-between gap-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 rounded-friendly-sm bg-brand-cyan border-2 border-ink shadow-hard-sm flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-ink" />
-              </div>
-              <span className="tactile-tag bg-brand-green text-ink">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{readiness?.engines.knowledge_engine || "Operational"}</span>
-              </span>
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-ink">Knowledge Engine</h2>
-              <p className="text-sm text-ink-muted mt-2 font-medium">
-                Lecture ingestion (PDF/PPT), slide-level chunk metadata preservation, pgvector hybrid search, and strict citation grounding.
-              </p>
-            </div>
-          </div>
-          <div className="text-xs space-y-2 pt-4 border-t-2 border-ink/10">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-ink-muted">Persistence:</span>
-              <span className="font-mono font-bold text-ink bg-surface-muted px-2 py-0.5 rounded border border-ink/20">pgvector</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-ink-muted">Uncertainty Rule:</span>
-              <span className="font-mono font-bold text-ink bg-surface-muted px-2 py-0.5 rounded border border-ink/20">Strict Abstention</span>
-            </div>
-          </div>
-        </div>
+          <button
+            onClick={() => setActiveTab("mastery")}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "mastery" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+            }`}
+          >
+            <Brain className="w-3.5 h-3.5 text-brand-green" />
+            <span>Mastery & Diagnosis</span>
+          </button>
 
-        {/* AI Execution Engine */}
-        <div className="tactile-card p-6 flex flex-col justify-between gap-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="w-12 h-12 rounded-friendly-sm bg-brand-coral border-2 border-ink shadow-hard-sm flex items-center justify-center">
-                <Cpu className="w-6 h-6 text-ink" />
-              </div>
-              <span className="tactile-tag bg-brand-green text-ink">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{readiness?.engines.ai_execution_engine || "Operational"}</span>
-              </span>
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-ink">AI Execution Engine</h2>
-              <p className="text-sm text-ink-muted mt-2 font-medium">
-                Bounded Ollama/Qwen adapter with strict Pydantic output schemas, 15s timeout circuit-breaker, and server-side tutor lockout.
-              </p>
-            </div>
-          </div>
-          <div className="text-xs space-y-2 pt-4 border-t-2 border-ink/10">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-ink-muted">Primary Model:</span>
-              <span className="font-mono font-bold text-ink bg-surface-muted px-2 py-0.5 rounded border border-ink/20">Qwen 2.5 (3B)</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-ink-muted">Assessment Guard:</span>
-              <span className="font-mono font-bold text-ink bg-brand-coral/20 px-2 py-0.5 rounded border border-ink/20">Tutor Lockout</span>
-            </div>
-          </div>
-        </div>
-      </section>
+          <button
+            onClick={() => setActiveTab("knowledge")}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "knowledge" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 text-brand-cyan" />
+            <span>Knowledge & Materials</span>
+          </button>
 
-      {/* Gateway Status & Contracts */}
-      <section className="tactile-card-warm p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-friendly-sm bg-brand-yellow border-2 border-ink shadow-hard-sm flex items-center justify-center">
-            <Activity className="w-6 h-6 text-ink" />
-          </div>
-          <div>
-            <div className="text-base font-black text-ink">Phase 0 Gateway Verification</div>
-            <div className="text-sm text-ink-muted font-medium">
-              Environment: <span className="font-mono font-bold text-ink">{health?.environment || "development"}</span> • Version: <span className="font-mono font-bold text-ink">{health?.version || "0.1.0"}</span>
-            </div>
-          </div>
-        </div>
+          <button
+            onClick={() => setActiveTab("practice")}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "practice" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-brand-coral" />
+            <span>Practice & Lockout</span>
+          </button>
 
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          <div className="tactile-tag bg-white text-ink">
-            <Database className="w-3.5 h-3.5 text-ink" />
-            <span>Async PostgreSQL + SQLAlchemy 2.0</span>
+          <button
+            onClick={() => setActiveTab("tutor")}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "tutor" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-brand-yellow" />
+            <span>AI Tutor (SLM A)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("revisor")}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "revisor" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+            }`}
+          >
+            <FileCheck2 className="w-3.5 h-3.5 text-brand-coral" />
+            <span>Revisor Audit (SLM B)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("scheduling")}
+            className={`tactile-btn-white text-xs py-2 px-3.5 font-bold ${
+              activeTab === "scheduling" ? "!bg-brand-yellow !shadow-hard-sm" : ""
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5 text-brand-cyan" />
+            <span>Spaced Scheduling (Rule 6)</span>
+          </button>
+        </nav>
+
+        {/* Tab Content Display */}
+        <main className="mt-6 pb-16">
+          {activeTab === "curriculum" && (
+            <CurriculumTab
+              course={selectedCourse}
+              topics={topics}
+              onSelectObjectiveForPractice={(obj) => {
+                setTargetObjectiveForPractice(obj);
+                setActiveTab("practice");
+              }}
+            />
+          )}
+
+          {activeTab === "mastery" && (
+            <MasteryDiagnosisTab
+              course={selectedCourse}
+              currentUser={currentUser}
+              onStartProbingPlan={() => {
+                setActiveTab("practice");
+              }}
+            />
+          )}
+
+          {activeTab === "knowledge" && <KnowledgeTab course={selectedCourse} />}
+
+          {activeTab === "practice" && (
+            <PracticeTab
+              course={selectedCourse}
+              topics={topics}
+              currentUser={currentUser}
+              activeScoredAssessmentId={activeScoredAssessmentId}
+              setActiveScoredAssessmentId={setActiveScoredAssessmentId}
+              targetObjective={targetObjectiveForPractice}
+            />
+          )}
+
+          {activeTab === "tutor" && (
+            <TutorTab
+              course={selectedCourse}
+              currentUser={currentUser}
+              hasActiveScoredAssessment={!!activeScoredAssessmentId}
+            />
+          )}
+
+          {activeTab === "revisor" && (
+            <RevisorTab
+              course={selectedCourse}
+              currentUser={currentUser}
+              hasActiveScoredAssessment={!!activeScoredAssessmentId}
+            />
+          )}
+
+          {activeTab === "scheduling" && (
+            <SchedulingTab
+              course={selectedCourse}
+              currentUser={currentUser}
+              onStartRetentionSession={() => {
+                setActiveTab("practice");
+              }}
+            />
+          )}
+        </main>
+      </div>
+
+      {/* Footer Gateway Info */}
+      <footer className="mt-auto border-t-2 border-ink/10 bg-surface-warm/40 py-6 px-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-medium text-ink-muted">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-ink">Recall Platform:</span>
+            <span>Deterministic Mastery &amp; Collaborative SLM Grounding</span>
           </div>
-          <div className="tactile-tag bg-white text-ink">
-            <ShieldAlert className="w-3.5 h-3.5 text-brand-coral" />
-            <span>RFC 7807 Problem Details</span>
+          <div className="flex items-center gap-4">
+            <span>Environment: {health?.environment || "development"}</span>
+            <span>Version: {health?.version || "0.1.0"}</span>
+            <span>Engine: {readiness?.status || "ready"}</span>
           </div>
         </div>
-      </section>
-    </main>
+      </footer>
+    </div>
   );
 }
