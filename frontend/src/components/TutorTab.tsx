@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -26,11 +26,37 @@ export function TutorTab({
   currentUser,
   hasActiveScoredAssessment,
 }: TutorTabProps) {
-  const [query, setQuery] = useState<string>("Can you explain Armstrong's Axioms and transitivity?");
+  const isOS =
+    course?.code.toUpperCase() === "CS301" ||
+    course?.title.toLowerCase().includes("operating system");
+  const isNetworks =
+    course?.code.toUpperCase() === "CS305" ||
+    course?.title.toLowerCase().includes("network");
+
+  const sample1 = isOS
+    ? "Can you explain deadlock conditions and prevention strategies?"
+    : isNetworks
+    ? "Can you explain the TCP 3-way handshake and reliability?"
+    : "Can you explain Armstrong's Axioms and transitivity?";
+
+  const sample2 = isOS
+    ? "What is virtual memory and how does page replacement work?"
+    : isNetworks
+    ? "What is the difference between TCP and UDP flow control?"
+    : "What is minimal cover and why is it useful?";
+
+  const [query, setQuery] = useState<string>(sample1);
   const [isAsking, setIsAsking] = useState<boolean>(false);
   const [response, setResponse] = useState<TutorQueryResponse | null>(null);
   const [lockoutError, setLockoutError] = useState<string | null>(null);
   const [generalError, setGeneralError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setQuery(sample1);
+    setResponse(null);
+    setGeneralError(null);
+    setLockoutError(null);
+  }, [course?.id, sample1]);
 
   const handleAskTutor = async () => {
     if (!course || !currentUser || !query.trim()) return;
@@ -56,8 +82,26 @@ export function TutorTab({
     } catch (err: unknown) {
       if (err instanceof ApiError && err.problem.code === "ASSESSMENT_LOCKOUT") {
         setLockoutError(err.problem.detail);
-      } else if (err instanceof ApiError && err.problem.code === "UNVERIFIED_EVIDENCE") {
-        setGeneralError(err.problem.detail);
+      } else if (
+        err instanceof ApiError &&
+        err.problem.code === "FORBIDDEN" &&
+        err.problem.detail.toLowerCase().includes("not enrolled")
+      ) {
+        // Automatically enroll student in this course and retry query once
+        try {
+          await recallApi.enrollUser(currentUser.id, course.id);
+          const retryResp = await recallApi.askTutor(course.id, currentUser.id, query);
+          setResponse(retryResp);
+          return;
+        } catch (retryErr: unknown) {
+          if (retryErr instanceof ApiError) {
+            setGeneralError(retryErr.problem.detail || retryErr.problem.title);
+          } else {
+            setGeneralError(retryErr instanceof Error ? retryErr.message : "Failed to query Grounded Tutor.");
+          }
+        }
+      } else if (err instanceof ApiError) {
+        setGeneralError(err.problem.detail || err.problem.title);
       } else {
         setGeneralError(err instanceof Error ? err.message : "Failed to query Grounded Tutor.");
       }
@@ -122,6 +166,23 @@ export function TutorTab({
         </div>
       )}
 
+      {/* General / Verification Error Alert */}
+      {generalError && (
+        <div className="tactile-card border-brand-coral bg-brand-coral/15 p-5 flex items-start gap-4 animate-shake">
+          <div className="w-9 h-9 rounded-friendly-sm bg-brand-coral text-white flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <div className="font-black text-sm text-ink">
+              Grounded AI Tutor Notice
+            </div>
+            <p className="text-xs text-ink font-medium leading-relaxed">
+              {generalError}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Inquire Sandbox */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Query Formulation */}
@@ -137,17 +198,17 @@ export function TutorTab({
               <div className="flex flex-col gap-1.5 text-xs">
                 <button
                   type="button"
-                  onClick={() => setQuery("Can you explain Armstrong's Axioms and transitivity?")}
+                  onClick={() => setQuery(sample1)}
                   className="p-2 border border-ink/20 rounded bg-surface hover:bg-surface-warm text-left text-[11px] font-medium"
                 >
-                  &quot;Can you explain Armstrong&apos;s Axioms and transitivity?&quot;
+                  &quot;{sample1}&quot;
                 </button>
                 <button
                   type="button"
-                  onClick={() => setQuery("What is minimal cover and why is it useful?")}
+                  onClick={() => setQuery(sample2)}
                   className="p-2 border border-ink/20 rounded bg-surface hover:bg-surface-warm text-left text-[11px] font-medium"
                 >
-                  &quot;What is minimal cover and why is it useful?&quot;
+                  &quot;{sample2}&quot;
                 </button>
                 <button
                   type="button"

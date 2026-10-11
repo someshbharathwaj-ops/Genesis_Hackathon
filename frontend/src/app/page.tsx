@@ -129,6 +129,9 @@ export default function HomePage() {
   // Course Selection Handler
   const handleSelectCourse = async (course: CourseResponse) => {
     setSelectedCourse(course);
+    if (currentUser?.role === "student") {
+      recallApi.enrollUser(currentUser.id, course.id).catch(() => {});
+    }
     try {
       const topList = await recallApi.getCourseTopics(course.id);
       setTopics(topList);
@@ -241,10 +244,10 @@ export default function HomePage() {
           setCurrentUser(user);
           setActiveTab("tutor");
           setMentorMode("tutor");
+          if (selectedCourse && user.role === "student") {
+            recallApi.enrollUser(user.id, selectedCourse.id).catch(() => {});
+          }
         }}
-        selectedCourseCode={selectedCourse?.code || "CS340"}
-        courses={courses}
-        onSelectCourse={handleSelectCourse}
       />
     );
   }
